@@ -1,7 +1,7 @@
-// 백엔드 없이 화면을 돌려보기 위한 예시 매장 데이터 (Figma 05·06 화면과 같은 구성)
-import { placeBreak, minBreakFor } from '../lib/rules';
-import { addDays, toMin } from '../lib/time';
-import type { Leave, Part, Schedule, Shift, Staff, Store } from '../types';
+// 테스트용 예시 매장 데이터 (Figma 05·06 화면과 같은 구성). 앱에는 들어가지 않는다.
+import { placeBreak, minBreakFor } from '../rules';
+import { addDays, toMin } from '../time';
+import type { Leave, Part, Schedule, Shift, Staff, Store } from '../../types';
 
 export const SEED_WEEK = '2026-11-02';
 
@@ -32,8 +32,8 @@ export const seedStore: Store = {
   minimumWage: 10320,
 };
 
-const hoursRange = (from: number, to: number) => Array.from({ length: to - from }, (_, i) => from + i);
-const everyDay = (from = 8, to = 22) => Array.from({ length: 7 }, () => hoursRange(from, to));
+const ALL = ['OPEN', 'MIDDLE', 'CLOSE'];
+const everyDay = (ids = ALL) => Array.from({ length: 7 }, () => [...ids]);
 
 const person = (p: Partial<Staff> & Pick<Staff, 'id' | 'name'>): Staff => ({
   employmentType: 'PART_TIME',
@@ -42,25 +42,25 @@ const person = (p: Partial<Staff> & Pick<Staff, 'id' | 'name'>): Staff => ({
   isMinor: false,
   contractWeeklyHours: null,
   preferredWeeklyHours: [8, 15],
-  availability: everyDay(),
+  availableParts: everyDay(),
   phone: '010-0000-0000',
   ...p,
 });
 
 const parkAvailability = everyDay();
-parkAvailability[5] = hoursRange(8, 17); // 박하은: 토요일 17시 이후 불가
+parkAvailability[5] = ['OPEN', 'MIDDLE']; // 박하은: 토요일 마감 불가
 
 export const seedStaff: Staff[] = [
-  person({ id: 1, name: '오지훈', employmentType: 'FULL_TIME', title: '매니저', hourlyWage: 13000, contractWeeklyHours: 40, preferredWeeklyHours: null, phone: '010-2481-3301' }),
-  person({ id: 2, name: '서하린', employmentType: 'FULL_TIME', title: '정직원', hourlyWage: 11500, contractWeeklyHours: 40, preferredWeeklyHours: null, availability: everyDay(7, 22), phone: '010-5512-0920' }),
+  person({ id: 1, name: '오지훈', employmentType: 'FULL_TIME', title: '매니저', hourlyWage: 13000, contractWeeklyHours: 40, preferredWeeklyHours: null, availableParts: everyDay([]), phone: '010-2481-3301' }),
+  person({ id: 2, name: '서하린', employmentType: 'FULL_TIME', title: '정직원', hourlyWage: 11500, contractWeeklyHours: 40, preferredWeeklyHours: null, availableParts: everyDay([]), phone: '010-5512-0920' }),
   person({ id: 3, name: '김민지', preferredWeeklyHours: [8, 15], phone: '010-3392-1187' }),
   person({ id: 4, name: '이서준', preferredWeeklyHours: [12, 16], phone: '010-7720-4410' }),
-  person({ id: 5, name: '박하은', preferredWeeklyHours: [10, 18], availability: parkAvailability, phone: '010-9031-5527' }),
+  person({ id: 5, name: '박하은', preferredWeeklyHours: [10, 18], availableParts: parkAvailability, phone: '010-9031-5527' }),
   person({ id: 6, name: '최도윤', preferredWeeklyHours: [15, 20], phone: '010-4418-6603' }),
   person({ id: 7, name: '정유나', preferredWeeklyHours: [10, 16], phone: '010-2205-7719' }),
   person({ id: 8, name: '강지호', preferredWeeklyHours: [10, 20], phone: '010-6630-2284' }),
   person({ id: 9, name: '윤서연', preferredWeeklyHours: [10, 16], phone: '010-8814-3356' }),
-  person({ id: 10, name: '한태민', title: '연소자', isMinor: true, preferredWeeklyHours: [6, 12], availability: everyDay(8, 20), phone: '010-1197-4402' }),
+  person({ id: 10, name: '한태민', title: '연소자', isMinor: true, preferredWeeklyHours: [6, 12], availableParts: everyDay(['OPEN', 'MIDDLE']), phone: '010-1197-4402' }),
 ];
 
 let n = 0;
@@ -121,7 +121,7 @@ brk(8, 4, '19:30');
 
 const leaves: Leave[] = [{ id: 'seed-leave-1', staffId: 2, date: date(3), type: 'ANNUAL' }];
 
-/** 한 주(11/2–11/8) 예시. 목업은 이 요일 패턴을 한 달에 반복한다 */
+/** 한 주(11/2–11/8) 예시 */
 export const seedWeek: Schedule = {
   id: 1,
   periodStart: SEED_WEEK,

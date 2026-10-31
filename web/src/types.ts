@@ -15,8 +15,10 @@ export interface Staff {
   contractWeeklyHours: number | null;
   /** 알바생만 사용. 희망 주간 근무시간 [최소, 최대] */
   preferredWeeklyHours: [number, number] | null;
-  /** 요일(0=월)별 근무 가능한 시작 시(hour) 목록. 예: [8, 9, 10] = 08~11시 가능 */
-  availability: number[][];
+  /** 알바생만 사용. 요일(0=월)별 근무 가능한 파트 id. 직원은 영업시간 안이면 언제나 가능 */
+  availableParts: string[][];
+  /** 직원만 사용. 고정 근무 시간(출근–퇴근). 없으면 날마다 자유롭게 정한다 */
+  workHours?: { start: string; end: string } | null;
   phone: string;
 }
 

@@ -19,7 +19,7 @@ export default function Layout() {
           <span className="grid size-8 place-items-center rounded-lg bg-brand font-bold text-white">오</span>
           <div className="leading-tight">
             <div className="font-bold">오토스케줄</div>
-            <div className="text-xs text-muted">{store ? `${store.name} · ${store.branch}` : ' '}</div>
+            <div className="text-xs text-muted">{store ? [store.name, store.branch].filter(Boolean).join(' · ') : ' '}</div>
           </div>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-col md:px-4">
@@ -40,15 +40,6 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
-        <div className="mt-auto hidden p-4 md:block">
-          <div className="flex items-center gap-3 rounded-lg bg-bg px-3 py-3">
-            <span className="grid size-8 place-items-center rounded-full bg-brand-subtle text-sm text-brand">김</span>
-            <div className="leading-tight">
-              <div className="text-sm font-medium">김사장</div>
-              <div className="text-xs text-muted">owner@cafe.kr</div>
-            </div>
-          </div>
-        </div>
       </aside>
       <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">
         <Outlet />

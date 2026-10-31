@@ -71,6 +71,20 @@ export function requiredAt(store: Store, date: string, t: number) {
   );
 }
 
+/**
+ * 알바생은 그 요일에 고른 파트만 근무 가능. 파트 없이 직접 입력한 근무는 고른 파트들 시간 안이면 된다.
+ * 직원은 언제나 가능.
+ */
+export function canWork(st: Staff, store: Store, s: Pick<Shift, 'date' | 'start' | 'end' | 'partId'>) {
+  if (st.employmentType === 'FULL_TIME') return true;
+  const ids = st.availableParts[dayIndex(s.date)] ?? [];
+  if (s.partId) return ids.includes(s.partId);
+  const parts = store.parts.filter((p) => ids.includes(p.id));
+  for (let t = toMin(s.start); t < toMin(s.end); t += 15)
+    if (!parts.some((p) => toMin(p.start) <= t && t < toMin(p.end))) return false;
+  return true;
+}
+
 /** 그 날의 영업시간 (평일 / 주말·공휴일) */
 export const hoursOn = (store: Store, date: string) =>
   isWeekendOrHoliday(date) ? { open: store.weekendOpen, close: store.weekendClose } : { open: store.open, close: store.close };
@@ -191,13 +205,7 @@ export function validate(schedule: Schedule, staffList: Staff[], store: Store, d
       const ctx = { shiftId: s.id, date: s.date };
       if (s.tentative) add({ ruleId: 'T-01', severity: 'info', message: `${at} 근무 시간 미정`, ...ctx });
 
-      const avail = st.availability[dayIndex(s.date)] ?? [];
-      for (let h = Math.floor(toMin(s.start) / 60); h < Math.ceil(toMin(s.end) / 60); h++) {
-        if (!avail.includes(h)) {
-          add({ ruleId: 'R-01', severity: 'error', message: `${at} ${s.start}–${s.end} 근무 불가 시간에 배치`, ...ctx });
-          break;
-        }
-      }
+      if (!canWork(st, store, s)) add({ ruleId: 'R-01', severity: 'error', message: `${at} ${s.start}–${s.end} 근무 가능 파트가 아님`, ...ctx });
       if (mine.slice(i + 1).some((o) => o.date === s.date && overlaps(s, o)))
         add({ ruleId: 'R-02', severity: 'error', message: `${at} 근무 시간 중복`, ...ctx });
       if (leaveDates.has(s.date)) add({ ruleId: 'R-02', severity: 'error', message: `${at} 연차일에 근무 배치`, ...ctx });

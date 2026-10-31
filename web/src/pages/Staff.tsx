@@ -3,14 +3,15 @@ import { useState } from 'react';
 import { api } from '../api';
 import { keys, useStaff, useStore } from '../api/queries';
 import PageHeader from '../components/PageHeader';
-import { Avatar, Badge, Button, Card, cx, Field, inputClass, Loading, Segmented } from '../components/ui';
-import { hoursSpan } from '../lib/rules';
+import { Avatar, Badge, Button, Card, cx, Field, inputBase, inputClass, Loading, Segmented } from '../components/ui';
 import { DAY_LABELS } from '../lib/time';
-import type { EmploymentType, Staff } from '../types';
+import type { EmploymentType, Part, Staff } from '../types';
 
 type Filter = 'ALL' | EmploymentType;
 
-const blank = (type: EmploymentType, open: number, close: number): Staff => ({
+const DEFAULT_HOURS = { start: '09:00', end: '18:00' };
+
+const blank = (type: EmploymentType): Staff => ({
   id: 0,
   name: '',
   employmentType: type,
@@ -19,7 +20,8 @@ const blank = (type: EmploymentType, open: number, close: number): Staff => ({
   isMinor: false,
   contractWeeklyHours: type === 'FULL_TIME' ? 40 : null,
   preferredWeeklyHours: type === 'PART_TIME' ? [8, 15] : null,
-  availability: Array.from({ length: 7 }, () => Array.from({ length: close - open }, (_, i) => open + i)),
+  availableParts: Array.from({ length: 7 }, () => []),
+  workHours: type === 'FULL_TIME' ? DEFAULT_HOURS : null,
   phone: '',
 });
 
@@ -30,9 +32,6 @@ export default function StaffPage() {
   const [editing, setEditing] = useState<Staff | null>(null);
 
   if (!staff || !store) return <Loading />;
-  const span = hoursSpan(store);
-  const open = Math.floor(span.open / 60);
-  const close = Math.ceil(span.close / 60);
   const list = staff.filter((s) => filter === 'ALL' || s.employmentType === filter);
   const count = (t: EmploymentType) => staff.filter((s) => s.employmentType === t).length;
 
@@ -42,7 +41,7 @@ export default function StaffPage() {
         title="직원·알바생 관리"
         sub="직원은 계약 주 근로시간 안에서 출근 시간을 유동 배치하고, 알바생은 파트 단위로 배치합니다."
         actions={
-          <Button variant="primary" onClick={() => setEditing(blank(filter === 'FULL_TIME' ? 'FULL_TIME' : 'PART_TIME', open, close))}>
+          <Button variant="primary" onClick={() => setEditing(blank(filter === 'FULL_TIME' ? 'FULL_TIME' : 'PART_TIME'))}>
             + 구성원 추가
           </Button>
         }
@@ -96,13 +95,13 @@ export default function StaffPage() {
             </tbody>
           </table>
         </Card>
-        {editing && <StaffForm key={editing.id || 'new'} initial={editing} open={open} close={close} minWage={store.minimumWage} onClose={() => setEditing(null)} />}
+        {editing && <StaffForm key={editing.id || 'new'} initial={editing} parts={store.parts} minWage={store.minimumWage} onClose={() => setEditing(null)} />}
       </div>
     </div>
   );
 }
 
-function StaffForm({ initial, open, close, minWage, onClose }: { initial: Staff; open: number; close: number; minWage: number; onClose: () => void }) {
+function StaffForm({ initial, parts, minWage, onClose }: { initial: Staff; parts: Part[]; minWage: number; onClose: () => void }) {
   const qc = useQueryClient();
   const [s, setS] = useState(initial);
   const set = (p: Partial<Staff>) => setS((x) => ({ ...x, ...p }));
@@ -114,19 +113,26 @@ function StaffForm({ initial, open, close, minWage, onClose }: { initial: Staff;
   const save = useMutation({ mutationFn: () => api.saveStaff(s), onSuccess: done });
   const remove = useMutation({ mutationFn: () => api.deleteStaff(s.id), onSuccess: done });
   const full = s.employmentType === 'FULL_TIME';
-  const hoursList = Array.from({ length: close - open }, (_, i) => open + i);
+  const badHours = full && !!s.workHours && s.workHours.start >= s.workHours.end;
 
   const setType = (t: EmploymentType) =>
     set({
       employmentType: t,
       title: t === 'FULL_TIME' ? '정직원' : s.isMinor ? '연소자' : '알바',
       contractWeeklyHours: t === 'FULL_TIME' ? (s.contractWeeklyHours ?? 40) : null,
+      workHours: t === 'FULL_TIME' ? (s.workHours ?? DEFAULT_HOURS) : null,
       preferredWeeklyHours: t === 'PART_TIME' ? (s.preferredWeeklyHours ?? [8, 15]) : null,
       isMinor: t === 'FULL_TIME' ? false : s.isMinor,
     });
-  const toggle = (d: number, h: number) =>
-    set({ availability: s.availability.map((row, i) => (i !== d ? row : row.includes(h) ? row.filter((x) => x !== h) : [...row, h].sort((a, b) => a - b))) });
-  const toggleDay = (d: number) => set({ availability: s.availability.map((row, i) => (i !== d ? row : row.length ? [] : hoursList)) });
+  // 순서는 매장 설정의 파트 순서를 따른다
+  const toggle = (d: number, id: string) =>
+    set({ availableParts: s.availableParts.map((row, i) => (i !== d ? row : parts.map((p) => p.id).filter((x) => (x === id ? !row.includes(x) : row.includes(x))))) });
+  const toggleDay = (d: number) => set({ availableParts: s.availableParts.map((row, i) => (i !== d ? row : row.length ? [] : parts.map((p) => p.id))) });
+  // 모든 요일에 켜져 있으면 다 끄고, 아니면 다 켠다
+  const togglePart = (id: string) => {
+    const on = !s.availableParts.every((row) => row.includes(id));
+    set({ availableParts: s.availableParts.map((row) => parts.map((p) => p.id).filter((x) => (x === id ? on : row.includes(x)))) });
+  };
 
   return (
     <Card className="space-y-4 p-5">
@@ -141,7 +147,7 @@ function StaffForm({ initial, open, close, minWage, onClose }: { initial: Staff;
         onChange={setType}
         options={[
           { value: 'PART_TIME', label: '알바생 (파트 근무)' },
-          { value: 'FULL_TIME', label: '직원 (유동 근무)' },
+          { value: 'FULL_TIME', label: '직원' },
         ]}
       />
       <div className="grid grid-cols-2 gap-3">
@@ -196,34 +202,55 @@ function StaffForm({ initial, open, close, minWage, onClose }: { initial: Staff;
 
       <div>
         <div className="mb-1.5 flex items-baseline justify-between">
-          <span className="text-[13px] font-medium">근무 가능 시간</span>
-          <span className="text-[11px] text-muted">{full ? '출근 가능한 범위 — 이 안에서 날마다 시간이 정해짐' : '칸을 눌러 가능/불가 전환'}</span>
+          <span className="text-[13px] font-medium">{full ? '고정 근무 시간' : '근무 파트'}</span>
+          {!full && <span className="text-[11px] text-muted">요일·파트 이름을 누르면 한 줄 전체 전환</span>}
         </div>
-        <div className="overflow-x-auto">
-          <div className="inline-grid gap-0.5" style={{ gridTemplateColumns: `28px repeat(${hoursList.length}, 20px)` }}>
-            <span />
-            {hoursList.map((h) => (
-              <span key={h} className="text-center text-[10px] text-muted">
-                {h % 2 === 0 ? h : ''}
-              </span>
-            ))}
-            {DAY_LABELS.map((d, di) => (
-              <div key={d} className="contents">
-                <button onClick={() => toggleDay(di)} className="text-left text-xs text-muted hover:text-ink">
+        {full ? (
+          <div className="flex items-center gap-2 text-sm">
+            <input type="time" step={900} aria-label="출근" className={cx(inputBase, 'w-32')} value={s.workHours?.start ?? DEFAULT_HOURS.start} onChange={(e) => set({ workHours: { ...(s.workHours ?? DEFAULT_HOURS), start: e.target.value } })} />
+            –
+            <input type="time" step={900} aria-label="퇴근" className={cx(inputBase, 'w-32')} value={s.workHours?.end ?? DEFAULT_HOURS.end} onChange={(e) => set({ workHours: { ...(s.workHours ?? DEFAULT_HOURS), end: e.target.value } })} />
+          </div>
+        ) : !parts.length ? (
+          <p className="text-xs text-muted">매장 설정에서 알바생 근무 파트를 먼저 추가하세요.</p>
+        ) : (
+          <div>
+            {/* 폼 너비(420px) 안에 7일이 다 보이도록 요일 칸은 남은 너비를 나눠 쓴다 */}
+            <div className="grid items-center gap-1" style={{ gridTemplateColumns: 'minmax(72px, max-content) repeat(7, minmax(0, 1fr))' }}>
+              <span />
+              {DAY_LABELS.map((d, di) => (
+                <button key={d} onClick={() => toggleDay(di)} className="text-center text-xs text-muted hover:text-ink">
                   {d}
                 </button>
-                {hoursList.map((h) => (
-                  <button
-                    key={h}
-                    onClick={() => toggle(di, h)}
-                    aria-label={`${d} ${h}시`}
-                    className={cx('h-5 rounded-sm', s.availability[di]?.includes(h) ? (full ? 'bg-staff/70' : 'bg-brand/70') : 'bg-bg hover:bg-line')}
-                  />
-                ))}
-              </div>
-            ))}
+              ))}
+              {parts.map((p) => (
+                <div key={p.id} className="contents">
+                  <button onClick={() => togglePart(p.id)} className="pr-2 text-left text-xs leading-tight hover:text-brand">
+                    <span className="font-medium">{p.name}</span>
+                    <br />
+                    <span className="text-[11px] text-muted">
+                      {p.start}–{p.end}
+                    </span>
+                  </button>
+                  {DAY_LABELS.map((d, di) => {
+                    const on = s.availableParts[di]?.includes(p.id);
+                    return (
+                      <button
+                        key={d}
+                        onClick={() => toggle(di, p.id)}
+                        aria-label={`${d} ${p.name}`}
+                        aria-pressed={on}
+                        className={cx('h-7 rounded-md text-xs', on ? 'bg-brand/70 font-medium text-white' : 'bg-bg text-muted hover:bg-line')}
+                      >
+                        {on ? '✓' : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {(save.error || remove.error) && <p className="text-sm text-danger">{(save.error ?? remove.error)!.message}</p>}
@@ -233,7 +260,7 @@ function StaffForm({ initial, open, close, minWage, onClose }: { initial: Staff;
             삭제
           </Button>
         )}
-        <Button variant="primary" className="ml-auto" disabled={!s.name.trim() || save.isPending} onClick={() => save.mutate()}>
+        <Button variant="primary" className="ml-auto" disabled={!s.name.trim() || badHours || save.isPending} onClick={() => save.mutate()}>
           저장
         </Button>
       </div>

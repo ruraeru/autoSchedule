@@ -9,6 +9,14 @@ import { addMonths, md, monthEnd, monthLabel, monthOf, ymd } from '../lib/time';
 import type { GenerateRequest } from '../types';
 
 const STEPS = ['매장 조건·가능 시간 분석', '직원 출근 시간 배치', '알바생 파트 배치', '근로 규칙 검증·보정'];
+/** 각 단계가 시작되는 진행률(%) */
+const STEP_AT = [0, 25, 55, 80];
+
+/**
+ * shortcut: Gemini는 한 번에 답을 돌려줘서 실제 진행률을 알 수 없다. 걸린 시간으로 추정한다
+ * (실측 1~3분: 60초에 약 60%, 2분에 약 82%, 끝나기 전엔 95%를 넘지 않음). 실제 진행률이 필요하면 스트리밍 응답으로 바꾼다.
+ */
+const estimate = (sec: number) => 95 * (1 - Math.exp(-sec / 60));
 
 function Choice({ active, onClick, title, desc }: { active: boolean; onClick: () => void; title: string; desc: string }) {
   return (
@@ -45,7 +53,7 @@ export default function Generate() {
     priority: 'FAIRNESS',
     fillContractHours: true,
   });
-  const [step, setStep] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
 
   const gen = useMutation({
     mutationFn: api.generateSchedule,
@@ -56,10 +64,13 @@ export default function Generate() {
   });
 
   useEffect(() => {
-    if (!gen.isPending) return setStep(0);
-    const t = setInterval(() => setStep((s) => Math.min(s + 1, STEPS.length - 1)), 600);
+    if (!gen.isPending) return setElapsed(0);
+    const started = Date.now();
+    const t = setInterval(() => setElapsed((Date.now() - started) / 1000), 500);
     return () => clearInterval(t);
   }, [gen.isPending]);
+  const pct = estimate(elapsed);
+  const step = STEP_AT.filter((at) => pct >= at).length - 1;
 
   if (!staff || !store) return <Loading />;
   const fullTime = staff.filter((s) => s.employmentType === 'FULL_TIME');
@@ -69,7 +80,25 @@ export default function Generate() {
     return (
       <Card className="mx-auto mt-10 max-w-md p-8">
         <h1 className="text-lg font-bold">Gemini가 근무표를 만들고 있어요</h1>
-        <p className="mt-1 text-sm text-muted">{monthLabel(req.periodStart)} · 직원 {fullTime.length}명 · 알바생 {staff.length - fullTime.length}명</p>
+        <p className="mt-1 text-sm text-muted">{monthLabel(req.periodStart)} · 직원 {fullTime.length}명 · 알바생 {staff.length - fullTime.length}명 · 보통 1~2분 걸려요</p>
+        <div className="mt-6">
+          <div
+            role="progressbar"
+            aria-label="근무표 생성 진행률(추정)"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(pct)}
+            className="h-2 overflow-hidden rounded-full bg-bg"
+          >
+            <div className="h-full rounded-full bg-brand transition-[width] duration-500 ease-out" style={{ width: `${pct}%` }} />
+          </div>
+          <div className="mt-1.5 flex justify-between text-xs text-muted tabular-nums">
+            <span>{Math.round(pct)}%</span>
+            <span>
+              {Math.floor(elapsed / 60)}:{String(Math.floor(elapsed % 60)).padStart(2, '0')} 경과
+            </span>
+          </div>
+        </div>
         <ol className="mt-6 space-y-3">
           {STEPS.map((s, i) => (
             <li key={s} className={cx('flex items-center gap-3 text-sm', i > step && 'text-muted')}>
@@ -90,7 +119,7 @@ export default function Generate() {
 
   return (
     <div className="max-w-3xl">
-      <PageHeader title="AI 근무표 생성" sub="조건을 고르면 직원과 알바생을 함께 배치하고 근로기준법 규칙으로 검증합니다." />
+      <PageHeader title="AI 근무표 생성" sub="조건을 고르면 Gemini가 직원과 알바생을 함께 배치합니다. 구성원 이름은 빼고 번호로만 전달합니다." />
       <Card className="space-y-7 p-6">
         <Section title="기간">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -122,9 +151,10 @@ export default function Generate() {
             </span>
           </label>
         </Section>
-        {gen.error && <p className="text-sm text-danger">생성 실패: {gen.error.message}. 잠시 후 다시 시도하거나 템플릿을 적용하세요.</p>}
-        <div className="flex justify-end">
-          <Button variant="primary" onClick={() => gen.mutate(req)}>
+        {gen.error && <p className="text-sm text-danger">생성 실패: {gen.error.message}</p>}
+        <div className="flex items-center justify-end gap-3">
+          {!staff.length && <span className="text-sm text-muted">직원·알바생을 먼저 등록하세요.</span>}
+          <Button variant="primary" onClick={() => gen.mutate(req)} disabled={!staff.length}>
             근무표 생성
           </Button>
         </div>

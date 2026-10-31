@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { seedStaff, seedStore, seedWeek as seedSchedule } from '../../api/seed';
+import { seedStaff, seedStore, seedWeek as seedSchedule } from './fixtures';
 import type { Shift } from '../../types';
-import { gaps, hoursOn, minBreakFor, requiredBreak, validate, withTimes } from '../rules';
+import { canWork, gaps, hoursOn, minBreakFor, requiredBreak, validate, withTimes } from '../rules';
 import { storeError } from '../../pages/Settings';
 import { datesBetween, monthEnd, weekDates, weeksOf } from '../time';
 
@@ -101,5 +101,19 @@ describe('영업시간 평일 / 주말·공휴일', () => {
     expect(hoursOn(store, '2026-11-06')).toEqual({ open: '08:00', close: '22:00' }); // 금
     expect(hoursOn(store, '2026-11-07')).toEqual({ open: '10:00', close: '20:00' }); // 토
     expect(hoursOn(store, '2026-10-09')).toEqual({ open: '10:00', close: '20:00' }); // 한글날(금)
+  });
+});
+
+describe('근무 가능 파트 (R-01)', () => {
+  const park = seedStaff.find((s) => s.id === 5)!; // 토요일 오픈·미들만 가능
+  const sat = '2026-11-07';
+  it('알바생은 그 요일에 고른 파트만, 직접 입력은 고른 파트 시간 안만 가능', () => {
+    expect(canWork(park, seedStore, { date: sat, start: '17:00', end: '22:00', partId: 'CLOSE' })).toBe(false);
+    expect(canWork(park, seedStore, { date: sat, start: '12:00', end: '17:00', partId: 'MIDDLE' })).toBe(true);
+    expect(canWork(park, seedStore, { date: sat, start: '10:00', end: '16:00', partId: null })).toBe(true);
+    expect(canWork(park, seedStore, { date: sat, start: '16:00', end: '18:00', partId: null })).toBe(false);
+  });
+  it('직원은 언제나 가능', () => {
+    expect(canWork(seedStaff[0], seedStore, { date: sat, start: '06:00', end: '23:00', partId: null })).toBe(true);
   });
 });

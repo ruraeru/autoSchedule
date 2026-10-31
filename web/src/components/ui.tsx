@@ -164,8 +164,10 @@ export function Field({ label, children, hint }: { label: string; children: Reac
   );
 }
 
-export const inputClass =
-  'h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/15';
+/** 너비 없는 입력칸 모양. 너비를 따로 줄 때 쓴다 (inputClass의 w-full이 다른 너비를 이기므로) */
+export const inputBase =
+  'h-10 rounded-lg border border-line bg-surface px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/15';
+export const inputClass = `${inputBase} w-full`;
 
 export function Stat({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: 'danger' | 'warning' }) {
   return (

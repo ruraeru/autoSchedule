@@ -38,7 +38,7 @@ export default function Dashboard() {
   return (
     <div>
       <PageHeader
-        title="안녕하세요, 김사장님"
+        title="대시보드"
         sub={`${monthLabel(current.periodStart)} 근무표 · ${current.status === 'CONFIRMED' ? '확정됨' : '작성 중'}`}
         actions={
           <>
