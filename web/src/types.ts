@@ -101,7 +101,7 @@ export interface Template {
   id: number;
   name: string;
   createdAt: string;
-  /** 날짜 대신 요일(0=월)로 저장해 다른 주에 적용한다 */
+  /** 날짜 대신 요일(0=월)로 저장해 다른 달의 같은 요일마다 적용한다 */
   shifts: (Omit<Shift, 'id' | 'date'> & { dayIndex: number })[];
   leaves: (Omit<Leave, 'id' | 'date'> & { dayIndex: number })[];
 }

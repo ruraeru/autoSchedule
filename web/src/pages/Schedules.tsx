@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useSchedules } from '../api/queries';
 import PageHeader from '../components/PageHeader';
 import { Badge, Button, Card, Loading } from '../components/ui';
-import { md, weekLabel } from '../lib/time';
+import { md, monthLabel } from '../lib/time';
 
 const SOURCE = { AI: 'AI 생성', TEMPLATE: '템플릿', MANUAL: '직접 작성' };
 
@@ -13,7 +13,7 @@ export default function Schedules() {
     <div>
       <PageHeader
         title="근무표"
-        sub="주 단위 근무표 목록"
+        sub="월 단위 근무표 목록"
         actions={
           <Link to="/schedules/new">
             <Button variant="primary">AI 근무표 생성</Button>
@@ -27,7 +27,7 @@ export default function Schedules() {
             <li key={s.id}>
               <Link to={`/schedules/${s.id}`} className="flex items-center gap-3 px-5 py-4 hover:bg-bg">
                 <div className="flex-1">
-                  <div className="font-bold">{weekLabel(s.periodStart)}</div>
+                  <div className="font-bold">{monthLabel(s.periodStart)}</div>
                   <div className="text-xs text-muted">
                     {md(s.periodStart)} – {md(s.periodEnd)} · 근무 {s.shifts.length}건 · {SOURCE[s.source]}
                   </div>

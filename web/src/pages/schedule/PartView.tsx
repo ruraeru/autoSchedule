@@ -1,24 +1,23 @@
 // 파트별 주간 보기: 알바생은 파트 칸으로 드래그, 직원은 유동 근무 줄에 시각으로 표시
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { cx } from '../../components/ui';
-import { placeBreak, withTimes, type Validation } from '../../lib/rules';
+import { placeBreak, withTimes } from '../../lib/rules';
 import { useEditor } from '../../store/editor';
 import type { Schedule, Staff, Store } from '../../types';
 import type { DialogTarget } from './ShiftDialog';
-import { DayHeader, DraggableShift, DropCell, GRID_COLS } from './WeekGrid';
+import { DayHeader, DraggableShift, DropCell, GRID_COLS, OutCell } from './WeekGrid';
 
 interface Props {
   schedule: Schedule;
   staff: Staff[];
   store: Store;
-  v: Validation;
-  dates: string[];
+  dates: (string | null)[];
   onOpen: (t: DialogTarget) => void;
 }
 
 const FREE = 'FREE';
 
-export default function PartView({ schedule, staff, store, v, dates, onOpen }: Props) {
+export default function PartView({ schedule, staff, store, dates, onOpen }: Props) {
   const edit = useEditor((s) => s.edit);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const nameOf = (id: number) => staff.find((s) => s.id === id)?.name ?? '';
@@ -65,7 +64,8 @@ export default function PartView({ schedule, staff, store, v, dates, onOpen }: P
                 <div className="text-[11px] text-muted">{r.sub}</div>
               </div>
             </div>
-            {dates.map((d) => {
+            {dates.map((d, i) => {
+              if (!d) return <OutCell key={i} />;
               const shifts = schedule.shifts
                 .filter((s) => s.date === d && (r.id === FREE ? !s.partId : s.partId === r.id))
                 .sort((a, b) => a.start.localeCompare(b.start));
@@ -75,7 +75,7 @@ export default function PartView({ schedule, staff, store, v, dates, onOpen }: P
                     shifts.map((s) => (
                       <div key={s.id}>
                         <div className="mb-0.5 truncate px-0.5 text-[11px] font-medium">{nameOf(s.staffId)}</div>
-                        <DraggableShift shift={s} store={store} v={v} onOpen={() => onOpen({ date: d, shift: s })} />
+                        <DraggableShift shift={s} store={store} onOpen={() => onOpen({ date: d, shift: s })} />
                       </div>
                     ))}
                 </DropCell>

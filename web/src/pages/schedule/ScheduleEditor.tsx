@@ -6,10 +6,9 @@ import { api } from '../../api';
 import { keys, useSchedule, useStaff, useStore } from '../../api/queries';
 import PageHeader from '../../components/PageHeader';
 import { Badge, Button, Card, cx, Loading, Segmented } from '../../components/ui';
-import { hours, md, weekDates, weekLabel, won } from '../../lib/time';
+import { datesBetween, hours, md, monthLabel, weeksOf, won } from '../../lib/time';
 import { useValidation } from '../../lib/useValidation';
 import { useEditor } from '../../store/editor';
-import type { Issue } from '../../types';
 import DayView from './DayView';
 import PartView from './PartView';
 import PersonView from './PersonView';
@@ -77,7 +76,7 @@ export default function ScheduleEditor() {
   });
   const saveTemplate = useMutation({
     mutationFn: async () => {
-      const name = window.prompt('템플릿 이름', `${weekLabel(draft!.periodStart)} 기본`);
+      const name = window.prompt('템플릿 이름', `${monthLabel(draft!.periodStart)} 기본`);
       if (!name) return null;
       if (useEditor.getState().dirty) await save.mutateAsync();
       return api.saveTemplate(name, id);
@@ -88,11 +87,21 @@ export default function ScheduleEditor() {
   if (error) return <p className="text-sm text-danger">근무표를 불러오지 못했습니다: {String(error.message)}</p>;
   if (!draft || draft.id !== id || !staff || !store || !v) return <Loading />;
 
-  const dates = weekDates(draft.periodStart);
-  const date = params.get('date') && dates.includes(params.get('date')!) ? params.get('date')! : dates[4];
+  const weeks = weeksOf(datesBetween(draft.periodStart, draft.periodEnd));
+  const paramDate = params.get('date');
+  const byDate = weeks.findIndex((w) => paramDate && w.includes(paramDate));
+  const wi = byDate >= 0 ? byDate : Math.min(Number(params.get('week')) || 0, weeks.length - 1);
+  const week = weeks[wi];
+  const dates = week.filter((d): d is string => d !== null);
+  const date = paramDate && dates.includes(paramDate) ? paramDate : dates[0];
   const setView = (next: View, d?: string) => setParams((p) => {
     p.set('view', next);
     if (d) p.set('date', d);
+    return p;
+  });
+  const setWeek = (i: number) => setParams((p) => {
+    p.set('week', String(i));
+    p.delete('date');
     return p;
   });
   const fullCount = staff.filter((s) => s.employmentType === 'FULL_TIME').length;
@@ -106,25 +115,18 @@ export default function ScheduleEditor() {
     a.click();
   };
 
-  const openIssue = (i: Issue) => {
-    const shift = i.shiftId && draft.shifts.find((s) => s.id === i.shiftId);
-    if (shift) setDialog({ date: shift.date, shift });
-    else if (i.date) setView('day', i.date);
-  };
-
   return (
     <div>
       <PageHeader
-        title={`근무표 · ${weekLabel(draft.periodStart)}`}
+        title={`근무표 · ${monthLabel(draft.periodStart)}`}
         badges={
           <>
             {draft.status === 'CONFIRMED' && <Badge tone="success">확정됨</Badge>}
-            {v.errorCount > 0 && <Badge tone="danger">위반 {v.errorCount}건</Badge>}
             {v.tentativeCount > 0 && <Badge tone="warning">미정 {v.tentativeCount}건</Badge>}
             {dirty && <Badge>저장 안 됨</Badge>}
           </>
         }
-        sub={`${draft.periodStart.replaceAll('-', '.')} (월) – ${md(draft.periodEnd)} (일) · 직원 ${fullCount}명(유동 근무) · 알바생 ${staff.length - fullCount}명(파트 근무)`}
+        sub={`${draft.periodStart.replaceAll('-', '.')} – ${md(draft.periodEnd)} · 직원 ${fullCount}명(유동 근무) · 알바생 ${staff.length - fullCount}명(파트 근무)`}
         actions={
           <>
             <Segmented<View>
@@ -149,7 +151,7 @@ export default function ScheduleEditor() {
               variant="primary"
               onClick={() => confirm.mutate()}
               disabled={!v.canConfirm || confirm.isPending || draft.status === 'CONFIRMED'}
-              title={v.canConfirm ? '' : '위반과 시간 미정을 먼저 해결하세요'}
+              title={v.canConfirm ? '' : '시간 미정을 먼저 해결하세요'}
             >
               확정하기
             </Button>
@@ -157,17 +159,28 @@ export default function ScheduleEditor() {
         }
       />
 
+      <div className="mb-4 overflow-x-auto">
+        <Segmented<string>
+          value={String(wi)}
+          onChange={(i) => setWeek(Number(i))}
+          options={weeks.map((w, i) => {
+            const days = w.filter((d): d is string => d !== null);
+            return { value: String(i), label: `${i + 1}주차 · ${md(days[0])}–${md(days[days.length - 1])}` };
+          })}
+        />
+      </div>
+
       {view === 'day' ? (
-        <DayView schedule={draft} staff={staff} store={store} v={v} dates={dates} date={date} onDate={(d) => setView('day', d)} onOpen={setDialog} />
+        <DayView schedule={draft} staff={staff} store={store} dates={dates} date={date} onDate={(d) => setView('day', d)} onOpen={setDialog} />
       ) : (
         <div className="grid gap-4 min-[1760px]:grid-cols-[1fr_320px]">
           <div className="min-w-0">
             <Card className="overflow-x-auto">
               <div ref={gridRef} className="bg-surface">
                 {view === 'person' ? (
-                  <PersonView schedule={draft} staff={staff} store={store} v={v} dates={dates} onOpen={setDialog} />
+                  <PersonView schedule={draft} staff={staff} store={store} v={v} dates={week} onOpen={setDialog} />
                 ) : (
-                  <PartView schedule={draft} staff={staff} store={store} v={v} dates={dates} onOpen={setDialog} />
+                  <PartView schedule={draft} staff={staff} store={store} dates={week} onOpen={setDialog} />
                 )}
               </div>
             </Card>
@@ -176,7 +189,6 @@ export default function ScheduleEditor() {
           <SidePanel
             v={v}
             comment={draft.aiComment}
-            onIssue={openIssue}
             actions={
               <div className="flex gap-2">
                 <Button size="sm" className="flex-1" onClick={exportPng}>
@@ -210,7 +222,6 @@ function Legend() {
     ['bg-staff', '직원 근무'],
     ['border-[1.5px] border-dashed border-staff', '시간 미정'],
     ['bg-muted/50', '연차·휴무'],
-    ['bg-danger', '규칙 위반'],
   ];
   return (
     <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
@@ -227,15 +238,7 @@ function Legend() {
   );
 }
 
-const SEVERITY: Record<Issue['severity'], { label: string; tone: 'danger' | 'warning' | 'neutral' }> = {
-  error: { label: '위반', tone: 'danger' },
-  info: { label: '미정', tone: 'warning' },
-  warning: { label: '주의', tone: 'neutral' },
-};
-
-function SidePanel({ v, comment, onIssue, actions }: { v: NonNullable<ReturnType<typeof useValidation>>; comment: string; onIssue: (i: Issue) => void; actions: ReactNode }) {
-  const order = { error: 0, info: 1, warning: 2 };
-  const issues = [...v.issues].sort((a, b) => order[a.severity] - order[b.severity]);
+function SidePanel({ v, comment, actions }: { v: NonNullable<ReturnType<typeof useValidation>>; comment: string; actions: ReactNode }) {
   return (
     <aside className="grid content-start gap-4 lg:grid-cols-3 min-[1760px]:grid-cols-1">
       <Card className="grid grid-cols-2 gap-y-3 p-4 text-[13px]">
@@ -264,24 +267,6 @@ function SidePanel({ v, comment, onIssue, actions }: { v: NonNullable<ReturnType
           <p className="mt-1.5 text-[13px] leading-relaxed text-muted">{comment}</p>
         </Card>
       )}
-
-      <Card className="p-4">
-        <h3 className="text-sm font-bold">점검 결과 {issues.length > 0 && <span className="text-muted">{issues.length}</span>}</h3>
-        {issues.length === 0 && <p className="mt-2 text-[13px] text-success">문제 없음 — 확정할 수 있습니다.</p>}
-        <ul className="mt-2 space-y-1">
-          {issues.map((i, k) => (
-            <li key={k}>
-              <button onClick={() => onIssue(i)} className="flex w-full items-start gap-2 rounded-md px-1.5 py-1 text-left text-[13px] hover:bg-bg">
-                <Badge tone={SEVERITY[i.severity].tone} className="mt-0.5">
-                  {SEVERITY[i.severity].label}
-                </Badge>
-                <span>{i.message}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-3 text-[11px] text-muted">검증 결과는 참고용이며 법률 자문이 아닙니다.</p>
-      </Card>
     </aside>
   );
 }

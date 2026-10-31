@@ -5,7 +5,7 @@ import { api } from '../api';
 import { keys, useStaff, useStore } from '../api/queries';
 import PageHeader from '../components/PageHeader';
 import { Button, Card, cx, Loading } from '../components/ui';
-import { addDays, md, mondayOf, weekLabel, ymd } from '../lib/time';
+import { addMonths, md, monthEnd, monthLabel, monthOf, ymd } from '../lib/time';
 import type { GenerateRequest } from '../types';
 
 const STEPS = ['매장 조건·가능 시간 분석', '직원 출근 시간 배치', '알바생 파트 배치', '근로 규칙 검증·보정'];
@@ -37,10 +37,10 @@ export default function Generate() {
   const { data: store } = useStore();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const thisWeek = mondayOf(ymd(new Date()));
-  const weeks = [0, 1, 2, 3].map((i) => addDays(thisWeek, i * 7));
+  const thisMonth = monthOf(ymd(new Date()));
+  const months = [0, 1, 2, 3].map((i) => addMonths(thisMonth, i));
   const [req, setReq] = useState<GenerateRequest>({
-    periodStart: weeks[1],
+    periodStart: months[1],
     weeklyHolidayPay: 'MINIMIZE',
     priority: 'FAIRNESS',
     fillContractHours: true,
@@ -69,7 +69,7 @@ export default function Generate() {
     return (
       <Card className="mx-auto mt-10 max-w-md p-8">
         <h1 className="text-lg font-bold">Gemini가 근무표를 만들고 있어요</h1>
-        <p className="mt-1 text-sm text-muted">{weekLabel(req.periodStart)} · 직원 {fullTime.length}명 · 알바생 {staff.length - fullTime.length}명</p>
+        <p className="mt-1 text-sm text-muted">{monthLabel(req.periodStart)} · 직원 {fullTime.length}명 · 알바생 {staff.length - fullTime.length}명</p>
         <ol className="mt-6 space-y-3">
           {STEPS.map((s, i) => (
             <li key={s} className={cx('flex items-center gap-3 text-sm', i > step && 'text-muted')}>
@@ -94,8 +94,8 @@ export default function Generate() {
       <Card className="space-y-7 p-6">
         <Section title="기간">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {weeks.map((w) => (
-              <Choice key={w} active={req.periodStart === w} onClick={() => set({ periodStart: w })} title={weekLabel(w)} desc={`${md(w)} – ${md(addDays(w, 6))}`} />
+            {months.map((m) => (
+              <Choice key={m} active={req.periodStart === m} onClick={() => set({ periodStart: m })} title={monthLabel(m)} desc={`${md(m)} – ${md(monthEnd(m))}`} />
             ))}
           </div>
         </Section>

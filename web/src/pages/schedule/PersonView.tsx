@@ -1,19 +1,19 @@
 // 인원별 주간 보기: 직원(유동 근무)과 알바생(파트 근무)을 한 표에
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { Avatar, Badge, cx, ShiftBlock } from '../../components/ui';
-import type { Validation } from '../../lib/rules';
+import type { StaffWeek, Validation } from '../../lib/rules';
 import { hours } from '../../lib/time';
 import { useEditor } from '../../store/editor';
 import type { Schedule, Staff, Store } from '../../types';
 import type { DialogTarget } from './ShiftDialog';
-import { DayHeader, DraggableShift, DropCell, GRID_COLS, GroupHeader } from './WeekGrid';
+import { DayHeader, DraggableShift, DropCell, GRID_COLS, GroupHeader, OutCell } from './WeekGrid';
 
 interface Props {
   schedule: Schedule;
   staff: Staff[];
   store: Store;
   v: Validation;
-  dates: string[];
+  dates: (string | null)[];
   onOpen: (t: DialogTarget) => void;
 }
 
@@ -37,7 +37,7 @@ export default function PersonView({ schedule, staff, store, v, dates, onOpen }:
   };
 
   const row = (p: Staff) => {
-    const w = v.weeks.get(p.id);
+    const w = v.weeks.get(dates.find(Boolean)!)?.get(p.id);
     const isFull = p.employmentType === 'FULL_TIME';
     return (
       <div key={p.id} className={cx('grid border-b border-line', GRID_COLS)}>
@@ -51,7 +51,8 @@ export default function PersonView({ schedule, staff, store, v, dates, onOpen }:
             {w && <div className="mt-0.5 truncate text-[11px] text-muted">{summary(p, w)}</div>}
           </div>
         </div>
-        {dates.map((d) => {
+        {dates.map((d, i) => {
+          if (!d) return <OutCell key={i} />;
           const shifts = schedule.shifts.filter((s) => s.staffId === p.id && s.date === d).sort((a, b) => a.start.localeCompare(b.start));
           const leave = schedule.leaves.some((l) => l.staffId === p.id && l.date === d);
           return (
@@ -60,7 +61,7 @@ export default function PersonView({ schedule, staff, store, v, dates, onOpen }:
                 <>
                   {leave && <ShiftBlock kind="leave" title="연차" sub="8h 유급" onClick={() => onOpen({ date: d, staffId: p.id })} />}
                   {shifts.map((s) => (
-                    <DraggableShift key={s.id} shift={s} store={store} v={v} onOpen={() => onOpen({ date: d, shift: s })} />
+                    <DraggableShift key={s.id} shift={s} store={store} onOpen={() => onOpen({ date: d, shift: s })} />
                   ))}
                 </>
               )}
@@ -85,7 +86,7 @@ export default function PersonView({ schedule, staff, store, v, dates, onOpen }:
   );
 }
 
-function summary(p: Staff, w: NonNullable<ReturnType<Validation['weeks']['get']>>) {
+function summary(p: Staff, w: StaffWeek) {
   if (p.employmentType === 'FULL_TIME') {
     if (w.tentativeMin || w.leaveMin)
       return [`확정 ${hours(w.workMin)}`, w.tentativeMin && `미정 ${hours(w.tentativeMin)}`, w.leaveMin && `연차 ${hours(w.leaveMin)}`].filter(Boolean).join(' · ');

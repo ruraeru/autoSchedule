@@ -3,19 +3,21 @@ import { useDraggable, useDroppable } from '@dnd-kit/core';
 import type { ReactNode } from 'react';
 import { blockKind, blockText } from '../../components/shiftDisplay';
 import { cx, ShiftBlock } from '../../components/ui';
-import type { Validation } from '../../lib/rules';
-import { dayIndex, DAY_LABELS, md } from '../../lib/time';
+import { DAY_LABELS, md } from '../../lib/time';
 import type { Shift, Store } from '../../types';
 
 export const GRID_COLS = 'grid-cols-[192px_repeat(7,minmax(112px,1fr))]';
 
-export function DayHeader({ dates, first }: { dates: string[]; first: string }) {
+/** 달 경계 밖 요일 칸 */
+export const OutCell = () => <div className="border-l border-line bg-bg/60" />;
+
+export function DayHeader({ dates, first }: { dates: (string | null)[]; first: string }) {
   return (
     <div className={cx('grid border-b border-line bg-bg/60 text-sm', GRID_COLS)}>
       <div className="px-4 py-3 text-xs text-muted">{first}</div>
-      {dates.map((d) => (
-        <div key={d} className={cx('py-3 text-center font-bold', dayIndex(d) >= 5 && 'text-brand')}>
-          {DAY_LABELS[dayIndex(d)]} {md(d)}
+      {dates.map((d, i) => (
+        <div key={i} className={cx('py-3 text-center font-bold', i >= 5 && 'text-brand', !d && 'text-muted/50')}>
+          {DAY_LABELS[i]} {d && md(d)}
         </div>
       ))}
     </div>
@@ -53,7 +55,7 @@ export function DropCell({ id, children, onEmptyClick, empty }: { id: string; ch
   );
 }
 
-export function DraggableShift({ shift, store, v, onOpen }: { shift: Shift; store: Store; v: Validation; onOpen: () => void }) {
+export function DraggableShift({ shift, store, onOpen }: { shift: Shift; store: Store; onOpen: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: shift.id });
   const { title, sub } = blockText(shift, store);
   return (
@@ -64,7 +66,7 @@ export function DraggableShift({ shift, store, v, onOpen }: { shift: Shift; stor
       style={transform ? { transform: `translate(${transform.x}px, ${transform.y}px)` } : undefined}
       className={cx('touch-none', isDragging && 'relative z-20 opacity-80 shadow-lg')}
     >
-      <ShiftBlock kind={blockKind(shift, store, v.issues)} title={title} sub={sub} onClick={onOpen} />
+      <ShiftBlock kind={blockKind(shift, store)} title={title} sub={sub} onClick={onOpen} />
     </div>
   );
 }

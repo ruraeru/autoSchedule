@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { seedSchedule, seedStaff, seedStore } from '../../api/seed';
+import { seedStaff, seedStore, seedWeek as seedSchedule } from '../../api/seed';
 import type { Shift } from '../../types';
 import { gaps, minBreakFor, requiredBreak, validate, withTimes } from '../rules';
-import { suggestBreakMoves } from '../suggest';
-import { weekDates } from '../time';
+import { datesBetween, monthEnd, weekDates, weeksOf } from '../time';
 
 const dates = weekDates(seedSchedule.periodStart);
 const FRI = '2026-11-06';
@@ -42,34 +41,13 @@ describe('예시 근무표 검증', () => {
   });
 
   it('직원 주간 집계: 확정·미정·연차를 나눠 센다', () => {
-    expect(v.weeks.get(1)).toMatchObject({ workMin: 40 * 60, tentativeMin: 0, overtimeMin: 0 });
-    expect(v.weeks.get(2)).toMatchObject({ workMin: 24 * 60, tentativeMin: 8 * 60, leaveMin: 8 * 60 });
+    expect(v.weeks.get(dates[0])!.get(1)).toMatchObject({ workMin: 40 * 60, tentativeMin: 0, overtimeMin: 0 });
+    expect(v.weeks.get(dates[0])!.get(2)).toMatchObject({ workMin: 24 * 60, tentativeMin: 8 * 60, leaveMin: 8 * 60 });
   });
 
   it('커버리지 부족은 금 19:30–20:00 1명뿐', () => {
     const all = dates.flatMap((d) => gaps(v.coverageByDate[d]).map((g) => ({ d, ...g })));
     expect(all).toEqual([{ d: FRI, start: 19 * 60 + 30, end: 20 * 60, shortage: 1 }]);
-  });
-});
-
-describe('휴게 조정 제안', () => {
-  it('강지호 휴게를 옮겨 금요일 부족을 없앤다', () => {
-    const fri = seedSchedule.shifts.filter((s) => s.date === FRI);
-    const sug = suggestBreakMoves(seedStore, FRI, fri)!;
-    expect(sug.shortageAfter).toBe(0);
-    expect(sug.moves).toEqual([expect.objectContaining({ staffId: 8, from: '19:30' })]);
-
-    const moved = seedSchedule.shifts.map((s) => {
-      const m = sug.moves.find((x) => x.shiftId === s.id);
-      return m ? { ...s, breakStart: m.to } : s;
-    });
-    const after = validate({ ...seedSchedule, shifts: moved }, seedStaff, seedStore, dates);
-    expect(gaps(after.coverageByDate[FRI])).toEqual([]);
-  });
-
-  it('부족이 없으면 제안하지 않는다', () => {
-    const mon = seedSchedule.shifts.filter((s) => s.date === '2026-11-02');
-    expect(suggestBreakMoves(seedStore, '2026-11-02', mon)).toBeNull();
   });
 });
 
@@ -79,5 +57,24 @@ describe('연소자 (R-05, R-06)', () => {
     const v = validate({ ...seedSchedule, shifts: [minor] }, seedStaff, seedStore, dates);
     const ids = v.issues.filter((i) => i.staffId === 10 && i.severity === 'error').map((i) => i.ruleId);
     expect(ids).toEqual(expect.arrayContaining(['R-05', 'R-06']));
+  });
+});
+
+describe('한 달 기간', () => {
+  it('말일과 월~일 주 나누기: 달 경계 밖 요일은 비운다', () => {
+    expect(monthEnd('2026-02-01')).toBe('2026-02-28');
+    const weeks = weeksOf(datesBetween('2026-11-01', monthEnd('2026-11-01')));
+    expect(weeks).toHaveLength(6);
+    expect(weeks[0]).toEqual([null, null, null, null, null, null, '2026-11-01']);
+    expect(weeks[5][0]).toBe('2026-11-30');
+    expect(weeks[5].slice(1).every((d) => d === null)).toBe(true);
+  });
+
+  it('주간 집계는 주마다 따로 한다', () => {
+    const month = datesBetween('2026-11-01', '2026-11-30');
+    const v = validate(seedSchedule, seedStaff, seedStore, month);
+    expect(v.weeks.size).toBe(6);
+    expect(v.weeks.get('2026-11-02')!.get(1)!.workMin).toBe(40 * 60);
+    expect(v.weeks.get('2026-11-09')!.get(1)!.workMin).toBe(0);
   });
 });

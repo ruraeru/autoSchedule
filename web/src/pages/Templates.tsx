@@ -5,18 +5,18 @@ import { api } from '../api';
 import { keys, useTemplates } from '../api/queries';
 import PageHeader from '../components/PageHeader';
 import { Button, Card, inputClass, Loading } from '../components/ui';
-import { addDays, md, mondayOf, weekLabel, ymd } from '../lib/time';
+import { addMonths, monthLabel, monthOf, ymd } from '../lib/time';
 
 export default function Templates() {
   const { data } = useTemplates();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const thisWeek = mondayOf(ymd(new Date()));
-  const weeks = [0, 1, 2, 3].map((i) => addDays(thisWeek, i * 7));
-  const [week, setWeek] = useState(weeks[1]);
+  const thisMonth = monthOf(ymd(new Date()));
+  const months = [0, 1, 2, 3].map((i) => addMonths(thisMonth, i));
+  const [month, setMonth] = useState(months[1]);
 
   const apply = useMutation({
-    mutationFn: (id: number) => api.applyTemplate(id, week),
+    mutationFn: (id: number) => api.applyTemplate(id, month),
     onSuccess: (s) => {
       qc.invalidateQueries({ queryKey: keys.schedules });
       navigate(`/schedules/${s.id}`);
@@ -32,12 +32,12 @@ export default function Templates() {
     <div className="max-w-3xl">
       <PageHeader
         title="템플릿"
-        sub="자주 쓰는 근무표를 저장해 두고 다른 주에 그대로 적용합니다. 근무표 화면의 '템플릿으로 저장'으로 만듭니다."
+        sub="근무표의 한 주 요일 패턴을 저장해 두고 다른 달의 같은 요일마다 적용합니다. 근무표 화면의 '템플릿으로 저장'으로 만듭니다."
         actions={
-          <select className={inputClass} value={week} onChange={(e) => setWeek(e.target.value)} aria-label="적용할 주">
-            {weeks.map((w) => (
-              <option key={w} value={w}>
-                {weekLabel(w)} ({md(w)}~) 에 적용
+          <select className={inputClass} value={month} onChange={(e) => setMonth(e.target.value)} aria-label="적용할 달">
+            {months.map((m) => (
+              <option key={m} value={m}>
+                {monthLabel(m)}에 적용
               </option>
             ))}
           </select>

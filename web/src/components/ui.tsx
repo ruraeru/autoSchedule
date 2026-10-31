@@ -91,7 +91,7 @@ export function Segmented<T extends string>({
   );
 }
 
-export type BlockKind = 'open' | 'middle' | 'close' | 'staff' | 'tentative' | 'leave' | 'error';
+export type BlockKind = 'open' | 'middle' | 'close' | 'staff' | 'tentative' | 'leave';
 
 const blockClass: Record<BlockKind, string> = {
   open: 'bg-open-bg text-open border-l-[3px] border-open',
@@ -100,7 +100,6 @@ const blockClass: Record<BlockKind, string> = {
   staff: 'bg-staff-bg text-staff border-l-[3px] border-staff',
   tentative: 'bg-surface text-staff border-[1.5px] border-dashed border-staff',
   leave: 'bg-bg text-muted',
-  error: 'bg-danger-subtle text-danger border-[1.5px] border-danger',
 };
 
 export function ShiftBlock({

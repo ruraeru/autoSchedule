@@ -117,7 +117,8 @@ brk(8, 4, '19:30');
 
 const leaves: Leave[] = [{ id: 'seed-leave-1', staffId: 2, date: date(3), type: 'ANNUAL' }];
 
-export const seedSchedule: Schedule = {
+/** 한 주(11/2–11/8) 예시. 목업은 이 요일 패턴을 한 달에 반복한다 */
+export const seedWeek: Schedule = {
   id: 1,
   periodStart: SEED_WEEK,
   periodEnd: addDays(SEED_WEEK, 6),

@@ -1,10 +1,9 @@
 import { workMin } from '../lib/rules';
 import { hours, shortRange } from '../lib/time';
-import type { Issue, Shift, Store } from '../types';
+import type { Shift, Store } from '../types';
 import type { BlockKind } from './ui';
 
-export function blockKind(shift: Shift, store: Store, issues: Issue[]): BlockKind {
-  if (issues.some((i) => i.shiftId === shift.id && i.severity === 'error')) return 'error';
+export function blockKind(shift: Shift, store: Store): BlockKind {
   if (shift.tentative) return 'tentative';
   if (!shift.partId) return 'staff';
   return store.parts.find((p) => p.id === shift.partId)?.tone ?? 'staff';
