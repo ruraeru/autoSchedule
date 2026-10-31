@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* Figma "Color" 변수와 1:1 대응 */
+@theme {
+  --font-sans: "Noto Sans KR", system-ui, sans-serif;
+  --color-bg: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-line: #e4e7ec;
+  --color-ink: #101828;
+  --color-muted: #667085;
+  --color-brand: #3b5bdb;
+  --color-brand-subtle: #edf2ff;
+  --color-danger: #d92d20;
+  --color-danger-subtle: #fef3f2;
+  --color-warning: #b54708;
+  --color-warning-subtle: #fffaeb;
+  --color-success: #067647;
+  --color-success-subtle: #ecfdf3;
+  --color-open: #075985;
+  --color-open-bg: #e0f2fe;
+  --color-middle: #166534;
+  --color-middle-bg: #dcfce7;
+  --color-close: #5b21b6;
+  --color-close-bg: #ede9fe;
+  --color-staff: #9a3412;
+  --color-staff-bg: #ffedd5;
+}
+
+body {
+  @apply bg-bg text-ink antialiased;
+}

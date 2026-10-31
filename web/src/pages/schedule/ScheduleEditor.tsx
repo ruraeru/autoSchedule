@@ -1,0 +1,288 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toPng } from 'html-to-image';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { api } from '../../api';
+import { keys, useSchedule, useStaff, useStore } from '../../api/queries';
+import PageHeader from '../../components/PageHeader';
+import { Badge, Button, Card, cx, Loading, Segmented } from '../../components/ui';
+import { hours, md, weekDates, weekLabel, won } from '../../lib/time';
+import { useValidation } from '../../lib/useValidation';
+import { useEditor } from '../../store/editor';
+import type { Issue } from '../../types';
+import DayView from './DayView';
+import PartView from './PartView';
+import PersonView from './PersonView';
+import ShiftDialog, { type DialogTarget } from './ShiftDialog';
+
+type View = 'part' | 'person' | 'day';
+
+export default function ScheduleEditor() {
+  const id = Number(useParams().id);
+  const [params, setParams] = useSearchParams();
+  const view = (params.get('view') as View) || 'person';
+  const qc = useQueryClient();
+
+  const { data: store } = useStore();
+  const { data: staff } = useStaff();
+  const { data: loaded, error } = useSchedule(id);
+  const { draft, dirty, past, future, load, undo, redo, markSaved } = useEditor();
+  const v = useValidation(draft, staff, store);
+  const [dialog, setDialog] = useState<DialogTarget | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (loaded && (draft?.id !== loaded.id || !dirty)) load(loaded);
+    // 서버 데이터가 바뀔 때만 다시 불러온다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return;
+      if ((e.target as HTMLElement).closest('input, select, textarea')) return;
+      e.preventDefault();
+      if (e.shiftKey) redo();
+      else undo();
+    };
+    const onUnload = (e: BeforeUnloadEvent) => {
+      if (useEditor.getState().dirty) e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('beforeunload', onUnload);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('beforeunload', onUnload);
+    };
+  }, [undo, redo]);
+
+  const save = useMutation({
+    mutationFn: () => api.saveSchedule(id, { shifts: draft!.shifts, leaves: draft!.leaves }),
+    onSuccess: (s) => {
+      markSaved(s);
+      qc.setQueryData(keys.schedule(id), s);
+      qc.invalidateQueries({ queryKey: keys.schedules, exact: true });
+    },
+  });
+  const confirm = useMutation({
+    mutationFn: async () => {
+      if (useEditor.getState().dirty) await api.saveSchedule(id, { shifts: draft!.shifts, leaves: draft!.leaves });
+      return api.confirmSchedule(id);
+    },
+    onSuccess: (s) => {
+      markSaved(s);
+      qc.setQueryData(keys.schedule(id), s);
+      qc.invalidateQueries({ queryKey: keys.schedules, exact: true });
+    },
+  });
+  const saveTemplate = useMutation({
+    mutationFn: async () => {
+      const name = window.prompt('템플릿 이름', `${weekLabel(draft!.periodStart)} 기본`);
+      if (!name) return null;
+      if (useEditor.getState().dirty) await save.mutateAsync();
+      return api.saveTemplate(name, id);
+    },
+    onSuccess: (t) => t && qc.invalidateQueries({ queryKey: keys.templates }),
+  });
+
+  if (error) return <p className="text-sm text-danger">근무표를 불러오지 못했습니다: {String(error.message)}</p>;
+  if (!draft || draft.id !== id || !staff || !store || !v) return <Loading />;
+
+  const dates = weekDates(draft.periodStart);
+  const date = params.get('date') && dates.includes(params.get('date')!) ? params.get('date')! : dates[4];
+  const setView = (next: View, d?: string) => setParams((p) => {
+    p.set('view', next);
+    if (d) p.set('date', d);
+    return p;
+  });
+  const fullCount = staff.filter((s) => s.employmentType === 'FULL_TIME').length;
+
+  const exportPng = async () => {
+    if (!gridRef.current) return;
+    const url = await toPng(gridRef.current, { backgroundColor: '#ffffff', pixelRatio: 2 });
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `근무표_${draft.periodStart}.png`;
+    a.click();
+  };
+
+  const openIssue = (i: Issue) => {
+    const shift = i.shiftId && draft.shifts.find((s) => s.id === i.shiftId);
+    if (shift) setDialog({ date: shift.date, shift });
+    else if (i.date) setView('day', i.date);
+  };
+
+  return (
+    <div>
+      <PageHeader
+        title={`근무표 · ${weekLabel(draft.periodStart)}`}
+        badges={
+          <>
+            {draft.status === 'CONFIRMED' && <Badge tone="success">확정됨</Badge>}
+            {v.errorCount > 0 && <Badge tone="danger">위반 {v.errorCount}건</Badge>}
+            {v.tentativeCount > 0 && <Badge tone="warning">미정 {v.tentativeCount}건</Badge>}
+            {dirty && <Badge>저장 안 됨</Badge>}
+          </>
+        }
+        sub={`${draft.periodStart.replaceAll('-', '.')} (월) – ${md(draft.periodEnd)} (일) · 직원 ${fullCount}명(유동 근무) · 알바생 ${staff.length - fullCount}명(파트 근무)`}
+        actions={
+          <>
+            <Segmented<View>
+              value={view}
+              onChange={(next) => setView(next)}
+              options={[
+                { value: 'part', label: '파트별' },
+                { value: 'person', label: '인원별' },
+                { value: 'day', label: '일간' },
+              ]}
+            />
+            <Button variant="ghost" size="sm" onClick={undo} disabled={!past.length} title="실행 취소 (⌘Z)">
+              ↶
+            </Button>
+            <Button variant="ghost" size="sm" onClick={redo} disabled={!future.length} title="다시 실행 (⇧⌘Z)">
+              ↷
+            </Button>
+            <Button onClick={() => save.mutate()} disabled={!dirty || save.isPending}>
+              {save.isPending ? '저장 중…' : '저장'}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => confirm.mutate()}
+              disabled={!v.canConfirm || confirm.isPending || draft.status === 'CONFIRMED'}
+              title={v.canConfirm ? '' : '위반과 시간 미정을 먼저 해결하세요'}
+            >
+              확정하기
+            </Button>
+          </>
+        }
+      />
+
+      {view === 'day' ? (
+        <DayView schedule={draft} staff={staff} store={store} v={v} dates={dates} date={date} onDate={(d) => setView('day', d)} onOpen={setDialog} />
+      ) : (
+        <div className="grid gap-4 min-[1760px]:grid-cols-[1fr_320px]">
+          <div className="min-w-0">
+            <Card className="overflow-x-auto">
+              <div ref={gridRef} className="bg-surface">
+                {view === 'person' ? (
+                  <PersonView schedule={draft} staff={staff} store={store} v={v} dates={dates} onOpen={setDialog} />
+                ) : (
+                  <PartView schedule={draft} staff={staff} store={store} v={v} dates={dates} onOpen={setDialog} />
+                )}
+              </div>
+            </Card>
+            <Legend />
+          </div>
+          <SidePanel
+            v={v}
+            comment={draft.aiComment}
+            onIssue={openIssue}
+            actions={
+              <div className="flex gap-2">
+                <Button size="sm" className="flex-1" onClick={exportPng}>
+                  이미지 저장
+                </Button>
+                <Button size="sm" className="flex-1" onClick={() => saveTemplate.mutate()}>
+                  템플릿으로 저장
+                </Button>
+              </div>
+            }
+          />
+        </div>
+      )}
+
+      {dialog && <ShiftDialog target={dialog} staff={staff} store={store} onClose={() => setDialog(null)} />}
+      {(save.error || confirm.error) && <p className="mt-3 text-sm text-danger">{String((save.error ?? confirm.error)!.message)}</p>}
+      {draft.status === 'CONFIRMED' && (
+        <p className="mt-3 text-sm text-muted">
+          확정된 근무표입니다. 수정 후 저장하면 변경 내역이 반영됩니다. <Link to="/schedules" className="text-brand">목록으로</Link>
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Legend() {
+  const items: [string, string][] = [
+    ['bg-open', '오픈'],
+    ['bg-middle', '미들'],
+    ['bg-close', '마감'],
+    ['bg-staff', '직원 근무'],
+    ['border-[1.5px] border-dashed border-staff', '시간 미정'],
+    ['bg-muted/50', '연차·휴무'],
+    ['bg-danger', '규칙 위반'],
+  ];
+  return (
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
+      <div className="flex flex-wrap gap-4">
+        {items.map(([c, l]) => (
+          <span key={l} className="flex items-center gap-1.5">
+            <span className={cx('size-2.5 rounded-sm', c)} />
+            {l}
+          </span>
+        ))}
+      </div>
+      <span>블록 드래그로 이동 · 빈 칸 클릭으로 추가</span>
+    </div>
+  );
+}
+
+const SEVERITY: Record<Issue['severity'], { label: string; tone: 'danger' | 'warning' | 'neutral' }> = {
+  error: { label: '위반', tone: 'danger' },
+  info: { label: '미정', tone: 'warning' },
+  warning: { label: '주의', tone: 'neutral' },
+};
+
+function SidePanel({ v, comment, onIssue, actions }: { v: NonNullable<ReturnType<typeof useValidation>>; comment: string; onIssue: (i: Issue) => void; actions: ReactNode }) {
+  const order = { error: 0, info: 1, warning: 2 };
+  const issues = [...v.issues].sort((a, b) => order[a.severity] - order[b.severity]);
+  return (
+    <aside className="grid content-start gap-4 lg:grid-cols-3 min-[1760px]:grid-cols-1">
+      <Card className="grid grid-cols-2 gap-y-3 p-4 text-[13px]">
+        <div>
+          <div className="text-muted">총 근무시간</div>
+          <div className="text-lg font-bold">{hours(v.totals.workMin)}</div>
+        </div>
+        <div>
+          <div className="text-muted">예상 인건비</div>
+          <div className="text-lg font-bold">{won(v.totals.cost)}</div>
+        </div>
+        <div>
+          <div className="text-muted">주휴수당 대상</div>
+          <div className="font-bold">알바생 {v.totals.weeklyHolidayCount}명</div>
+        </div>
+        <div>
+          <div className="text-muted">주휴수당 합계</div>
+          <div className="font-bold">{won(v.totals.holidayPay)}</div>
+        </div>
+        <div className="col-span-2">{actions}</div>
+      </Card>
+
+      {comment && (
+        <Card className="p-4">
+          <h3 className="text-sm font-bold">AI 브리핑</h3>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-muted">{comment}</p>
+        </Card>
+      )}
+
+      <Card className="p-4">
+        <h3 className="text-sm font-bold">점검 결과 {issues.length > 0 && <span className="text-muted">{issues.length}</span>}</h3>
+        {issues.length === 0 && <p className="mt-2 text-[13px] text-success">문제 없음 — 확정할 수 있습니다.</p>}
+        <ul className="mt-2 space-y-1">
+          {issues.map((i, k) => (
+            <li key={k}>
+              <button onClick={() => onIssue(i)} className="flex w-full items-start gap-2 rounded-md px-1.5 py-1 text-left text-[13px] hover:bg-bg">
+                <Badge tone={SEVERITY[i.severity].tone} className="mt-0.5">
+                  {SEVERITY[i.severity].label}
+                </Badge>
+                <span>{i.message}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 text-[11px] text-muted">검증 결과는 참고용이며 법률 자문이 아닙니다.</p>
+      </Card>
+    </aside>
+  );
+}
+

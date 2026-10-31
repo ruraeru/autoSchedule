@@ -1,0 +1,58 @@
+import { NavLink, Outlet } from 'react-router-dom';
+import { useStore } from '../api/queries';
+import { cx } from './ui';
+
+const NAV = [
+  { to: '/', label: '대시보드', end: true },
+  { to: '/schedules', label: '근무표' },
+  { to: '/staff', label: '직원·알바생 관리' },
+  { to: '/templates', label: '템플릿' },
+  { to: '/settings', label: '매장 설정' },
+];
+
+export default function Layout() {
+  const { data: store } = useStore();
+  return (
+    <div className="min-h-screen md:flex">
+      <aside className="border-b border-line bg-surface md:sticky md:top-0 md:flex md:h-screen md:w-60 md:shrink-0 md:flex-col md:border-r md:border-b-0">
+        <div className="flex items-center gap-3 px-4 pt-4 pb-3 md:px-6 md:pt-6 md:pb-6">
+          <span className="grid size-8 place-items-center rounded-lg bg-brand font-bold text-white">오</span>
+          <div className="leading-tight">
+            <div className="font-bold">오토스케줄</div>
+            <div className="text-xs text-muted">{store ? `${store.name} · ${store.branch}` : ' '}</div>
+          </div>
+        </div>
+        <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-col md:px-4">
+          {NAV.map((n) => (
+            <NavLink
+              key={n.to}
+              to={n.to}
+              end={n.end}
+              className={({ isActive }) =>
+                cx(
+                  'flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm',
+                  isActive ? 'bg-brand-subtle font-medium text-brand' : 'text-muted hover:bg-bg hover:text-ink',
+                )
+              }
+            >
+              <span className="size-1.5 rounded-full bg-current" />
+              {n.label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="mt-auto hidden p-4 md:block">
+          <div className="flex items-center gap-3 rounded-lg bg-bg px-3 py-3">
+            <span className="grid size-8 place-items-center rounded-full bg-brand-subtle text-sm text-brand">김</span>
+            <div className="leading-tight">
+              <div className="text-sm font-medium">김사장</div>
+              <div className="text-xs text-muted">owner@cafe.kr</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+      <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">
+        <Outlet />
+      </main>
+    </div>
+  );
+}
