@@ -6,8 +6,8 @@ import type { Leave, Part, Schedule, Shift, Staff, Store } from '../types';
 export const SEED_WEEK = '2026-11-02';
 
 const parts: Part[] = [
-  { id: 'OPEN', name: '오픈', tone: 'open', start: '08:00', end: '11:30', breakMinutes: minBreakFor(210) },
-  { id: 'MIDDLE', name: '미들', tone: 'middle', start: '11:30', end: '17:00', breakMinutes: minBreakFor(330) },
+  { id: 'OPEN', name: '오픈', tone: 'open', start: '08:00', end: '12:00', breakMinutes: minBreakFor(240) },
+  { id: 'MIDDLE', name: '미들', tone: 'middle', start: '12:00', end: '17:00', breakMinutes: minBreakFor(300) },
   { id: 'CLOSE', name: '마감', tone: 'close', start: '17:00', end: '22:00', breakMinutes: minBreakFor(300) },
 ];
 
@@ -18,10 +18,12 @@ export const seedStore: Store = {
   size: 'OVER_5',
   open: '08:00',
   close: '22:00',
+  weekendOpen: '08:00',
+  weekendClose: '22:00',
   parts,
   demand: [
-    { start: '08:00', end: '11:30', required: 1 },
-    { start: '11:30', end: '14:00', required: 2 },
+    { start: '08:00', end: '12:00', required: 1 },
+    { start: '12:00', end: '14:00', required: 2 },
     { start: '14:00', end: '17:00', required: 1 },
     { start: '17:00', end: '20:00', required: 2 },
     { start: '20:00', end: '22:00', required: 1 },
@@ -112,6 +114,8 @@ brk(5, 6, '14:30'); brk(9, 6, '15:30'); brk(8, 5, '14:30');
 brk(6, 0, '20:00'); brk(9, 0, '20:30'); brk(6, 1, '20:00'); brk(6, 3, '20:00');
 brk(8, 2, '20:00'); brk(9, 2, '20:30'); brk(6, 5, '20:00'); brk(5, 5, '20:30');
 brk(3, 6, '20:00'); brk(8, 6, '20:30');
+// 금 오픈 휴게는 오지훈 출근(11:00) 뒤로 (Figma 06과 같음)
+brk(3, 4, '11:30');
 // 금요일 강지호 휴게를 저녁 피크(19:30)에 둬서 커버리지 부족 예시를 만든다
 brk(8, 4, '19:30');
 

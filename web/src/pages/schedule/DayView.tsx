@@ -2,7 +2,7 @@
 import { useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { blockKind } from '../../components/shiftDisplay';
 import { Avatar, Card, cx } from '../../components/ui';
-import { breakRange, placeBreak, withTimes, workMin } from '../../lib/rules';
+import { breakRange, hoursOn, placeBreak, withTimes, workMin } from '../../lib/rules';
 import { dayIndex, DAY_LABELS, fromMin, hours, md, snap, toMin } from '../../lib/time';
 import { useEditor } from '../../store/editor';
 import type { Schedule, Shift, Staff, Store } from '../../types';
@@ -143,10 +143,10 @@ export default function DayView({ schedule, staff, store, dates, date, onDate, o
                   {hoursTicks.map((h) => (
                     <span key={h} className="absolute inset-y-0 border-l border-line/70" style={{ left: pct(h) }} />
                   ))}
-                  <span className="absolute inset-y-0 bg-bg/70" style={{ left: 0, width: pct(toMin(store.open)) }} />
-                  <span className="absolute inset-y-0 right-0 bg-bg/70" style={{ left: pct(toMin(store.close)) }} />
+                  <span className="absolute inset-y-0 bg-bg/70" style={{ left: 0, width: pct(toMin(hoursOn(store, date).open)) }} />
+                  <span className="absolute inset-y-0 right-0 bg-bg/70" style={{ left: pct(toMin(hoursOn(store, date).close)) }} />
                   {leave && (
-                    <div className="absolute inset-y-3 flex items-center rounded-md bg-bg px-3 text-xs text-muted" style={{ left: pct(toMin(store.open)), right: `calc(100% - ${pct(toMin(store.close))})` }}>
+                    <div className="absolute inset-y-3 flex items-center rounded-md bg-bg px-3 text-xs text-muted" style={{ left: pct(toMin(hoursOn(store, date).open)), right: `calc(100% - ${pct(toMin(hoursOn(store, date).close))})` }}>
                       연차 · 8h 유급
                     </div>
                   )}

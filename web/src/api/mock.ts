@@ -3,8 +3,8 @@ import { datesBetween, dayIndex, monthEnd, weeksOf } from '../lib/time';
 import type { GenerateRequest, Schedule, Shift, Staff, Store, Template } from '../types';
 import { seedStaff, seedStore, seedWeek } from './seed';
 
-// v2: 근무표 기간이 1주에서 한 달로 바뀜
-const KEY = 'autoschedule-mock-v2';
+// v4: 평일 / 주말·공휴일 영업시간 분리
+const KEY = 'autoschedule-mock-v4';
 
 interface Db {
   store: Store;
@@ -67,11 +67,6 @@ const persist = () => {
 const delay = <T>(value: T, ms = 250) => new Promise<T>((r) => setTimeout(() => r(structuredClone(value)), ms));
 const notFound = () => Promise.reject(new Error('찾을 수 없습니다'));
 export const mock = {
-  reset() {
-    db = fresh();
-    persist();
-  },
-
   getStore: () => delay(db.store),
   updateStore(store: Store) {
     db.store = store;

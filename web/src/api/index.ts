@@ -41,5 +41,3 @@ export const api = {
     USE_MOCK ? mock.applyTemplate(id, periodStart) : http('POST', `/templates/${id}/apply`, { periodStart }),
 };
 
-export const isMock = USE_MOCK;
-export const resetMock = () => mock.reset();

@@ -4,7 +4,8 @@ import { api } from '../api';
 import { keys, useStaff, useStore } from '../api/queries';
 import PageHeader from '../components/PageHeader';
 import { Avatar, Badge, Button, Card, cx, Field, inputClass, Loading, Segmented } from '../components/ui';
-import { DAY_LABELS, toMin } from '../lib/time';
+import { hoursSpan } from '../lib/rules';
+import { DAY_LABELS } from '../lib/time';
 import type { EmploymentType, Staff } from '../types';
 
 type Filter = 'ALL' | EmploymentType;
@@ -29,8 +30,9 @@ export default function StaffPage() {
   const [editing, setEditing] = useState<Staff | null>(null);
 
   if (!staff || !store) return <Loading />;
-  const open = toMin(store.open) / 60;
-  const close = toMin(store.close) / 60;
+  const span = hoursSpan(store);
+  const open = Math.floor(span.open / 60);
+  const close = Math.ceil(span.close / 60);
   const list = staff.filter((s) => filter === 'ALL' || s.employmentType === filter);
   const count = (t: EmploymentType) => staff.filter((s) => s.employmentType === t).length;
 

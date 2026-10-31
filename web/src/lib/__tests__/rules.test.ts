@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { seedStaff, seedStore, seedWeek as seedSchedule } from '../../api/seed';
 import type { Shift } from '../../types';
-import { gaps, minBreakFor, requiredBreak, validate, withTimes } from '../rules';
+import { gaps, hoursOn, minBreakFor, requiredBreak, validate, withTimes } from '../rules';
+import { storeError } from '../../pages/Settings';
 import { datesBetween, monthEnd, weekDates, weeksOf } from '../time';
 
 const dates = weekDates(seedSchedule.periodStart);
@@ -45,9 +46,13 @@ describe('예시 근무표 검증', () => {
     expect(v.weeks.get(dates[0])!.get(2)).toMatchObject({ workMin: 24 * 60, tentativeMin: 8 * 60, leaveMin: 8 * 60 });
   });
 
-  it('커버리지 부족은 금 19:30–20:00 1명뿐', () => {
+  it('커버리지 부족: 오픈 혼자인 목·일 휴게 구간과 금 19:30–20:00', () => {
     const all = dates.flatMap((d) => gaps(v.coverageByDate[d]).map((g) => ({ d, ...g })));
-    expect(all).toEqual([{ d: FRI, start: 19 * 60 + 30, end: 20 * 60, shortage: 1 }]);
+    expect(all).toEqual([
+      { d: '2026-11-05', start: 10 * 60, end: 10 * 60 + 30, shortage: 1 },
+      { d: FRI, start: 19 * 60 + 30, end: 20 * 60, shortage: 1 },
+      { d: '2026-11-08', start: 10 * 60, end: 10 * 60 + 30, shortage: 1 },
+    ]);
   });
 });
 
@@ -76,5 +81,25 @@ describe('한 달 기간', () => {
     expect(v.weeks.size).toBe(6);
     expect(v.weeks.get('2026-11-02')!.get(1)!.workMin).toBe(40 * 60);
     expect(v.weeks.get('2026-11-09')!.get(1)!.workMin).toBe(0);
+  });
+});
+
+describe('매장 설정 검증', () => {
+  it('영업시간·파트 시간이 어긋나면 저장을 막는다', () => {
+    expect(storeError(seedStore)).toBeNull();
+    expect(storeError({ ...seedStore, open: '22:00', close: '08:00' })).toMatch('평일 영업 종료');
+    expect(storeError({ ...seedStore, weekendOpen: '23:00' })).toMatch('주말·공휴일');
+    const late = { ...seedStore.parts[2], end: '23:00' };
+    expect(storeError({ ...seedStore, parts: [late] })).toMatch('영업시간 안');
+    expect(storeError({ ...seedStore, parts: [{ ...late, name: ' ' }] })).toMatch('이름');
+  });
+});
+
+describe('영업시간 평일 / 주말·공휴일', () => {
+  it('토·일과 공휴일은 주말 영업시간을 쓴다', () => {
+    const store = { ...seedStore, weekendOpen: '10:00', weekendClose: '20:00' };
+    expect(hoursOn(store, '2026-11-06')).toEqual({ open: '08:00', close: '22:00' }); // 금
+    expect(hoursOn(store, '2026-11-07')).toEqual({ open: '10:00', close: '20:00' }); // 토
+    expect(hoursOn(store, '2026-10-09')).toEqual({ open: '10:00', close: '20:00' }); // 한글날(금)
   });
 });

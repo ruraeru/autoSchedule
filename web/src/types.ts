@@ -45,8 +45,12 @@ export interface Store {
   name: string;
   branch: string;
   size: 'UNDER_5' | 'OVER_5';
+  /** 평일 영업시간 */
   open: string;
   close: string;
+  /** 주말·공휴일 영업시간 */
+  weekendOpen: string;
+  weekendClose: string;
   parts: Part[];
   demand: DemandBlock[];
   minimumWage: number;

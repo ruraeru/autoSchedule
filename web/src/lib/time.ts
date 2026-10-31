@@ -36,6 +36,16 @@ export const md = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.s
 /** "금 11/6" */
 export const dayLabel = (date: string) => `${DAY_LABELS[dayIndex(date)]} ${md(date)}`;
 
+// shortcut: 2026년 공휴일·대체공휴일만 하드코딩. 다른 해도 쓰려면 공공데이터 특일정보 API로 바꾼다.
+const HOLIDAYS = new Set([
+  '2026-01-01', '2026-02-16', '2026-02-17', '2026-02-18', '2026-03-01', '2026-03-02', '2026-05-01', '2026-05-05',
+  '2026-05-24', '2026-05-25', '2026-06-03', '2026-06-06', '2026-07-17', '2026-08-15', '2026-08-17', '2026-09-24',
+  '2026-09-25', '2026-09-26', '2026-10-03', '2026-10-05', '2026-10-09', '2026-12-25',
+]);
+
+/** 토·일 또는 공휴일 */
+export const isWeekendOrHoliday = (date: string) => dayIndex(date) >= 5 || HOLIDAYS.has(date);
+
 /** 그 달 1일 */
 export const monthOf = (date: string) => `${date.slice(0, 7)}-01`;
 

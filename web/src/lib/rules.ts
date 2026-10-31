@@ -1,6 +1,6 @@
 // 클라이언트 미리보기용 규칙 엔진 (PRD §7). 확정 전 최종 검증은 서버가 같은 규칙으로 다시 한다.
 import type { Issue, Schedule, Shift, Staff, Store } from '../types';
-import { dayIndex, dayLabel, fromMin, hours, snap, toMin, weeksOf } from './time';
+import { dayIndex, dayLabel, fromMin, hours, isWeekendOrHoliday, snap, toMin, weeksOf } from './time';
 
 export const SLOT = 30;
 const WEEKLY_HOLIDAY_MIN = 15 * 60;
@@ -71,9 +71,20 @@ export function requiredAt(store: Store, date: string, t: number) {
   );
 }
 
+/** 그 날의 영업시간 (평일 / 주말·공휴일) */
+export const hoursOn = (store: Store, date: string) =>
+  isWeekendOrHoliday(date) ? { open: store.weekendOpen, close: store.weekendClose } : { open: store.open, close: store.close };
+
+/** 평일·주말을 모두 덮는 시각 범위(분) */
+export const hoursSpan = (store: Store) => ({
+  open: Math.min(toMin(store.open), toMin(store.weekendOpen)),
+  close: Math.max(toMin(store.close), toMin(store.weekendClose)),
+});
+
 export function coverage(store: Store, date: string, dayShifts: Shift[]): Slot[] {
   const slots: Slot[] = [];
-  for (let t = toMin(store.open); t < toMin(store.close); t += SLOT) {
+  const { open, close } = hoursOn(store, date);
+  for (let t = toMin(open); t < toMin(close); t += SLOT) {
     slots.push({ t, required: requiredAt(store, date, t), present: dayShifts.filter((s) => isWorking(s, t)).length });
   }
   return slots;
