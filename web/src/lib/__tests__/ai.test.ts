@@ -44,7 +44,19 @@ describe('Gemini 응답 검증', () => {
 });
 
 it('고정 근무 시간이 있는 직원은 그 시각으로 맞춘다', () => {
-  const staff = seedStaff.map((s) => (s.id === 1 ? { ...s, workHours: { start: '10:00', end: '19:00' } } : s));
+  const staff = seedStaff.map((s) => (s.id === 1 ? { ...s, workHours: Array.from({ length: 7 }, () => ({ start: '10:00', end: '19:00' })) } : s));
   const [s] = toShifts({ comment: '', shifts: [{ staffId: 1, date: '2026-11-02', start: '08:00', end: '20:00', partId: null }] }, { ...input, staff }, uid);
   expect([s.start, s.end, s.breakMinutes]).toEqual(['10:00', '19:00', 60]);
+});
+
+it('고정 근무는 요일별 시각을 따르고 쉬는 요일은 버린다', () => {
+  // 월 10–19, 화 쉼, 수 13–22
+  const workHours = [{ start: '10:00', end: '19:00' }, null, { start: '13:00', end: '22:00' }, null, null, null, null];
+  const staff = seedStaff.map((s) => (s.id === 1 ? { ...s, workHours } : s));
+  const day = (date: string) => ({ staffId: 1, date, start: '10:00', end: '19:00', partId: null });
+  const out = toShifts({ comment: '', shifts: [day('2026-11-02'), day('2026-11-03'), day('2026-11-04')] }, { ...input, staff }, uid);
+  expect(out.map((s) => [s.date, s.start, s.end])).toEqual([
+    ['2026-11-02', '10:00', '19:00'],
+    ['2026-11-04', '13:00', '22:00'],
+  ]);
 });

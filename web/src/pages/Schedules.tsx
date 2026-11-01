@@ -15,9 +15,14 @@ export default function Schedules() {
         title="근무표"
         sub="월 단위 근무표 목록"
         actions={
-          <Link to="/schedules/new">
-            <Button variant="primary">AI 근무표 생성</Button>
-          </Link>
+          <>
+            <Link to="/schedules/manual">
+              <Button>직접 만들기</Button>
+            </Link>
+            <Link to="/schedules/new">
+              <Button variant="primary">AI 근무표 생성</Button>
+            </Link>
+          </>
         }
       />
       <Card>

@@ -1,20 +1,22 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toPng } from 'html-to-image';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../api';
-import { keys, useSchedule, useStaff, useStore } from '../../api/queries';
+import { keys, useSchedule, useSchedules, useStaff, useStore } from '../../api/queries';
 import PageHeader from '../../components/PageHeader';
 import { Badge, Button, Card, cx, Loading, Segmented } from '../../components/ui';
-import { datesBetween, hours, md, monthLabel, weeksOf, won } from '../../lib/time';
+import { autoFill } from '../../lib/autofill';
+import { addMonths, datesBetween, hours, md, monthLabel, weeksOf, won } from '../../lib/time';
 import { useValidation } from '../../lib/useValidation';
 import { useEditor } from '../../store/editor';
 import DayView from './DayView';
+import MonthView from './MonthView';
 import PartView from './PartView';
 import PersonView from './PersonView';
 import ShiftDialog, { type DialogTarget } from './ShiftDialog';
 
-type View = 'part' | 'person' | 'day';
+type View = 'month' | 'part' | 'person' | 'day';
 
 export default function ScheduleEditor() {
   const id = Number(useParams().id);
@@ -25,7 +27,9 @@ export default function ScheduleEditor() {
   const { data: store } = useStore();
   const { data: staff } = useStaff();
   const { data: loaded, error } = useSchedule(id);
-  const { draft, dirty, past, future, load, undo, redo, markSaved } = useEditor();
+  const { data: all } = useSchedules();
+  const navigate = useNavigate();
+  const { draft, dirty, past, future, load, edit, undo, redo, markSaved } = useEditor();
   const v = useValidation(draft, staff, store);
   const [dialog, setDialog] = useState<DialogTarget | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -104,6 +108,14 @@ export default function ScheduleEditor() {
     p.delete('date');
     return p;
   });
+  // 전월·익월 근무표. 한 달에 여럿이면(확정본 + 작성 중) 최근 것
+  const monthSchedule = (n: number) =>
+    all?.filter((s) => s.periodStart === addMonths(draft.periodStart, n)).sort((a, b) => b.id - a.id)[0];
+  const goMonth = (n: number) => {
+    const to = monthSchedule(n);
+    if (!to || (dirty && !window.confirm('저장하지 않은 변경 사항이 사라집니다. 이동할까요?'))) return;
+    navigate(`/schedules/${to.id}?view=${view}`);
+  };
   const fullCount = staff.filter((s) => s.employmentType === 'FULL_TIME').length;
 
   const exportPng = async () => {
@@ -118,7 +130,23 @@ export default function ScheduleEditor() {
   return (
     <div>
       <PageHeader
-        title={`근무표 · ${monthLabel(draft.periodStart)}`}
+        title={
+          <span className="flex items-center gap-1">
+            {([-1, 1] as const).map((n) => (
+              <button
+                key={n}
+                onClick={() => goMonth(n)}
+                disabled={!monthSchedule(n)}
+                aria-label={n < 0 ? '전월 근무표' : '익월 근무표'}
+                title={monthSchedule(n) ? monthLabel(addMonths(draft.periodStart, n)) : `${monthLabel(addMonths(draft.periodStart, n))} 근무표 없음`}
+                className={cx('grid size-8 place-items-center rounded-lg text-lg text-muted hover:bg-bg hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent', n > 0 && 'order-last')}
+              >
+                {n < 0 ? '‹' : '›'}
+              </button>
+            ))}
+            <span>근무표 · {monthLabel(draft.periodStart)}</span>
+          </span>
+        }
         badges={
           <>
             {draft.status === 'CONFIRMED' && <Badge tone="success">확정됨</Badge>}
@@ -133,11 +161,23 @@ export default function ScheduleEditor() {
               value={view}
               onChange={(next) => setView(next)}
               options={[
+                { value: 'month', label: '한 달' },
                 { value: 'part', label: '파트별' },
                 { value: 'person', label: '인원별' },
                 { value: 'day', label: '일간' },
               ]}
             />
+            <Button
+              onClick={() =>
+                edit((d) => {
+                  d.shifts = autoFill(store, staff, datesBetween(d.periodStart, d.periodEnd), d.shifts, d.leaves, () => crypto.randomUUID());
+                })
+              }
+              disabled={draft.status === 'CONFIRMED'}
+              title="이미 넣은 근무는 두고, 빈 날과 인원이 모자란 파트만 규칙대로 채웁니다 (실행 취소 가능)"
+            >
+              자동 채우기
+            </Button>
             <Button variant="ghost" size="sm" onClick={undo} disabled={!past.length} title="실행 취소 (⌘Z)">
               ↶
             </Button>
@@ -159,7 +199,7 @@ export default function ScheduleEditor() {
         }
       />
 
-      <div className="mb-4 overflow-x-auto">
+      <div className={cx('mb-4 overflow-x-auto', view === 'month' && 'hidden')}>
         <Segmented<string>
           value={String(wi)}
           onChange={(i) => setWeek(Number(i))}
@@ -177,7 +217,9 @@ export default function ScheduleEditor() {
           <div className="min-w-0">
             <Card className="overflow-x-auto">
               <div ref={gridRef} className="bg-surface">
-                {view === 'person' ? (
+                {view === 'month' ? (
+                  <MonthView schedule={draft} staff={staff} store={store} onDate={(d) => setView('day', d)} />
+                ) : view === 'person' ? (
                   <PersonView schedule={draft} staff={staff} store={store} v={v} dates={week} onOpen={setDialog} />
                 ) : (
                   <PartView schedule={draft} staff={staff} store={store} dates={week} onOpen={setDialog} />

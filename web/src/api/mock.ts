@@ -1,4 +1,5 @@
 // 백엔드 없이 동작하는 브라우저 DB. localStorage에 보관해 새로고침해도 유지한다.
+import { fixedShifts } from '../lib/rules';
 import { toShifts, type AiInput, type AiOutput } from '../lib/ai';
 import { datesBetween, dayIndex, monthEnd, weeksOf } from '../lib/time';
 import type { GenerateRequest, Schedule, Shift, Staff, Store, Template } from '../types';
@@ -48,6 +49,12 @@ const fresh = (): Db => structuredClone({ store: defaultStore, staff: [], schedu
 function upgrade(d: Db): Db {
   const all = d.store.parts.map((p) => p.id);
   d.staff = d.staff.map((s) => (Array.isArray(s.availableParts) ? s : { ...s, availableParts: Array.from({ length: 7 }, () => (s.employmentType === 'PART_TIME' ? [...all] : [])) }));
+  // 예전 고정 근무 {start, end, days?} → 요일별 배열
+  d.staff = d.staff.map((s) => {
+    const w = s.workHours as unknown as { start: string; end: string; days?: number[] } | null | undefined;
+    if (!w || Array.isArray(w)) return s;
+    return { ...s, workHours: Array.from({ length: 7 }, (_, i) => (!w.days || w.days.includes(i) ? { start: w.start, end: w.end } : null)) };
+  });
   return d;
 }
 
@@ -122,6 +129,27 @@ export const mock = {
     s.status = 'CONFIRMED';
     persist();
     return delay(s);
+  },
+
+  /** 직접 작성할 빈 근무표. prefillFixed면 직원 고정 근무를 미리 넣는다 */
+  createSchedule(periodStart: string, prefillFixed: boolean) {
+    const dates = datesBetween(periodStart, monthEnd(periodStart));
+    const schedule: Schedule = {
+      id: Math.max(0, ...db.schedules.map((s) => s.id)) + 1,
+      periodStart,
+      periodEnd: monthEnd(periodStart),
+      status: 'DRAFT',
+      source: 'MANUAL',
+      policy: { weeklyHolidayPay: 'ALLOW', priority: 'FAIRNESS' },
+      shifts: prefillFixed ? fixedShifts(db.store, db.staff, dates, uid) : [],
+      leaves: [],
+      aiComment: '',
+      updatedAt: new Date().toISOString(),
+    };
+    db.schedules = db.schedules.filter((s) => s.periodStart !== periodStart || s.status === 'CONFIRMED');
+    db.schedules.push(schedule);
+    persist();
+    return delay(schedule);
   },
 
   /** Gemini(vite 서버의 /ai/generate)로 만들고, 응답은 규칙에 맞는 근무만 남긴다 */

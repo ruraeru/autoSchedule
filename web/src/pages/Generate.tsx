@@ -18,7 +18,7 @@ const STEP_AT = [0, 25, 55, 80];
  */
 const estimate = (sec: number) => 95 * (1 - Math.exp(-sec / 60));
 
-function Choice({ active, onClick, title, desc }: { active: boolean; onClick: () => void; title: string; desc: string }) {
+export function Choice({ active, onClick, title, desc }: { active: boolean; onClick: () => void; title: string; desc: string }) {
   return (
     <button
       type="button"
@@ -31,7 +31,7 @@ function Choice({ active, onClick, title, desc }: { active: boolean; onClick: ()
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
       <h2 className="mb-2.5 text-sm font-bold">{title}</h2>

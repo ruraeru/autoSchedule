@@ -5,11 +5,13 @@ import { keys, useStaff, useStore } from '../api/queries';
 import PageHeader from '../components/PageHeader';
 import { Avatar, Badge, Button, Card, cx, Field, inputBase, inputClass, Loading, Segmented } from '../components/ui';
 import { DAY_LABELS } from '../lib/time';
-import type { EmploymentType, Part, Staff } from '../types';
+import type { EmploymentType, Part, Staff, WorkTime } from '../types';
 
 type Filter = 'ALL' | EmploymentType;
 
-const DEFAULT_HOURS = { start: '09:00', end: '18:00' };
+const DEFAULT_TIME: WorkTime = { start: '09:00', end: '18:00' };
+// 기본은 월~금 09–18
+const defaultHours = () => DAY_LABELS.map((_, i) => (i < 5 ? { ...DEFAULT_TIME } : null));
 
 const blank = (type: EmploymentType): Staff => ({
   id: 0,
@@ -21,7 +23,7 @@ const blank = (type: EmploymentType): Staff => ({
   contractWeeklyHours: type === 'FULL_TIME' ? 40 : null,
   preferredWeeklyHours: type === 'PART_TIME' ? [8, 15] : null,
   availableParts: Array.from({ length: 7 }, () => []),
-  workHours: type === 'FULL_TIME' ? DEFAULT_HOURS : null,
+  workHours: type === 'FULL_TIME' ? defaultHours() : null,
   phone: '',
 });
 
@@ -113,14 +115,19 @@ function StaffForm({ initial, parts, minWage, onClose }: { initial: Staff; parts
   const save = useMutation({ mutationFn: () => api.saveStaff(s), onSuccess: done });
   const remove = useMutation({ mutationFn: () => api.deleteStaff(s.id), onSuccess: done });
   const full = s.employmentType === 'FULL_TIME';
-  const badHours = full && !!s.workHours && s.workHours.start >= s.workHours.end;
+  const wh = s.workHours ?? defaultHours();
+  const noDay = wh.every((w) => !w);
+  const badHours = full && (noDay || wh.some((w) => w && w.start >= w.end));
+  const setDay = (d: number, w: WorkTime | null) => set({ workHours: wh.map((x, i) => (i === d ? w : x)) });
+  // 새로 켠 요일은 바로 앞 근무 요일 시각을 따른다
+  const prevTime = (d: number) => wh.slice(0, d).reverse().find(Boolean) ?? wh.find(Boolean) ?? DEFAULT_TIME;
 
   const setType = (t: EmploymentType) =>
     set({
       employmentType: t,
       title: t === 'FULL_TIME' ? '정직원' : s.isMinor ? '연소자' : '알바',
       contractWeeklyHours: t === 'FULL_TIME' ? (s.contractWeeklyHours ?? 40) : null,
-      workHours: t === 'FULL_TIME' ? (s.workHours ?? DEFAULT_HOURS) : null,
+      workHours: t === 'FULL_TIME' ? (s.workHours ?? defaultHours()) : null,
       preferredWeeklyHours: t === 'PART_TIME' ? (s.preferredWeeklyHours ?? [8, 15]) : null,
       isMinor: t === 'FULL_TIME' ? false : s.isMinor,
     });
@@ -202,14 +209,37 @@ function StaffForm({ initial, parts, minWage, onClose }: { initial: Staff; parts
 
       <div>
         <div className="mb-1.5 flex items-baseline justify-between">
-          <span className="text-[13px] font-medium">{full ? '고정 근무 시간' : '근무 파트'}</span>
-          {!full && <span className="text-[11px] text-muted">요일·파트 이름을 누르면 한 줄 전체 전환</span>}
+          <span className="text-[13px] font-medium">{full ? '고정 근무 요일·시간' : '근무 파트'}</span>
+          <span className="text-[11px] text-muted">{full ? '요일을 눌러 근무·쉼 전환' : '요일·파트 이름을 누르면 한 줄 전체 전환'}</span>
         </div>
         {full ? (
-          <div className="flex items-center gap-2 text-sm">
-            <input type="time" step={900} aria-label="출근" className={cx(inputBase, 'w-32')} value={s.workHours?.start ?? DEFAULT_HOURS.start} onChange={(e) => set({ workHours: { ...(s.workHours ?? DEFAULT_HOURS), start: e.target.value } })} />
-            –
-            <input type="time" step={900} aria-label="퇴근" className={cx(inputBase, 'w-32')} value={s.workHours?.end ?? DEFAULT_HOURS.end} onChange={(e) => set({ workHours: { ...(s.workHours ?? DEFAULT_HOURS), end: e.target.value } })} />
+          <div className="space-y-1.5">
+            {DAY_LABELS.map((d, di) => {
+              const w = wh[di];
+              return (
+                <div key={d} className="flex items-center gap-2 text-sm">
+                  <button
+                    onClick={() => setDay(di, w ? null : { ...prevTime(di) })}
+                    aria-pressed={!!w}
+                    aria-label={`${d}요일 근무`}
+                    className={cx('h-8 w-9 shrink-0 rounded-md text-xs', w ? 'bg-staff/80 font-medium text-white' : 'bg-bg text-muted hover:bg-line')}
+                  >
+                    {d}
+                  </button>
+                  {w ? (
+                    <>
+                      <input type="time" step={900} aria-label={`${d} 출근`} className={cx(inputBase, 'h-8 w-28')} value={w.start} onChange={(e) => setDay(di, { ...w, start: e.target.value })} />
+                      –
+                      <input type="time" step={900} aria-label={`${d} 퇴근`} className={cx(inputBase, 'h-8 w-28')} value={w.end} onChange={(e) => setDay(di, { ...w, end: e.target.value })} />
+                      {w.start >= w.end && <span className="text-xs text-danger">시각 확인</span>}
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted">쉼</span>
+                  )}
+                </div>
+              );
+            })}
+            {noDay && <p className="text-xs text-danger">근무 요일을 하나 이상 고르세요.</p>}
           </div>
         ) : !parts.length ? (
           <p className="text-xs text-muted">매장 설정에서 알바생 근무 파트를 먼저 추가하세요.</p>

@@ -3,6 +3,11 @@
 /** FULL_TIME = 직원(유동 근무, 계약 주 근로시간), PART_TIME = 알바생(파트 근무) */
 export type EmploymentType = 'FULL_TIME' | 'PART_TIME';
 
+export interface WorkTime {
+  start: string;
+  end: string;
+}
+
 export interface Staff {
   id: number;
   name: string;
@@ -18,7 +23,8 @@ export interface Staff {
   /** 알바생만 사용. 요일(0=월)별 근무 가능한 파트 id. 직원은 영업시간 안이면 언제나 가능 */
   availableParts: string[][];
   /** 직원만 사용. 고정 근무 시간(출근–퇴근). 없으면 날마다 자유롭게 정한다 */
-  workHours?: { start: string; end: string } | null;
+  /** 직원 고정 근무. 요일별(0=월) 출퇴근 시각, null이면 쉬는 날. 전체가 null이면 시간 자유 */
+  workHours?: (WorkTime | null)[] | null;
   phone: string;
 }
 
@@ -121,4 +127,9 @@ export interface Issue {
   staffId?: number;
   shiftId?: string;
   date?: string;
+}
+
+export interface User {
+  name: string;
+  email: string;
 }

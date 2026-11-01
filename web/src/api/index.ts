@@ -30,6 +30,8 @@ export const api = {
     USE_MOCK ? mock.saveSchedule(id, body) : http('PUT', `/schedules/${id}/shifts`, body),
   confirmSchedule: (id: number): Promise<Schedule> =>
     USE_MOCK ? mock.confirmSchedule(id) : http('POST', `/schedules/${id}/confirm`),
+  createSchedule: (periodStart: string, prefillFixed: boolean): Promise<Schedule> =>
+    USE_MOCK ? mock.createSchedule(periodStart, prefillFixed) : http('POST', '/schedules', { periodStart, prefillFixed }),
   generateSchedule: (req: GenerateRequest): Promise<Schedule> =>
     USE_MOCK ? mock.generateSchedule(req) : http('POST', '/schedules/generate', req),
 

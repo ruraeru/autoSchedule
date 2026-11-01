@@ -55,7 +55,7 @@ export function buildPrompt({ store, staff, req }: AiInput): string {
         ? `계약 주 ${s.contractWeeklyHours ?? 40}시간`
         : `희망 주 ${s.preferredWeeklyHours?.join('–') ?? '자유'}시간`;
     if (s.employmentType === 'FULL_TIME')
-      return `${base}, ${hours}, ${s.workHours ? `고정 근무 시간 ${s.workHours.start}–${s.workHours.end} (근무일만 정한다)` : '영업시간 안이면 언제나 근무 가능'}`;
+      return `${base}, ${hours}, ${s.workHours ? `고정 근무(요일별, 쉼인 요일은 근무 없음): ${DAY_LABELS.map((d, i) => `${d} ${s.workHours![i] ? `${s.workHours![i]!.start}–${s.workHours![i]!.end}` : '쉼'}`).join(' / ')}` : '영업시간 안이면 언제나 근무 가능'}`;
     const avail = DAY_LABELS.map((d, i) => `${d} ${(s.availableParts[i] ?? []).map((id) => `"${id}"`).join('·') || '불가'}`).join(' / ');
     return `${base}, ${hours}, 근무 가능 파트(partId): ${avail}`;
   });
@@ -82,7 +82,7 @@ ${people.join('\n')}
 
 ## 규칙
 1. 알바생은 partId에 파트 id를 넣고 start/end는 그 파트 시각과 똑같이 한다.
-2. 직원은 partId를 null로 한다. 고정 근무 시간이 있으면 start/end를 그 시각과 똑같이 하고 근무일만 정한다. 없으면 출퇴근 시각을 15분 단위로 정해 인력이 부족한 시간대를 메운다.
+2. 직원은 partId를 null로 한다. 고정 근무가 있으면 근무 요일마다 start/end를 그 요일 시각과 똑같이 넣는다. 없으면 출퇴근 시각을 15분 단위로 정해 인력이 부족한 시간대를 메운다.
 3. 근무는 그날 영업시간 안에서만 한다. 알바생은 그 요일의 근무 가능 파트에만 배치한다. 한 사람은 하루에 한 번만 근무한다.
 4. 연소자는 하루 7시간, 주 35시간 이하이고 22시 이후 근무 불가.
 5. 주(월~일) 근로시간은 40시간 이하, 연장 포함 52시간 이하.
@@ -112,7 +112,9 @@ export function toShifts(out: AiOutput, { store, staff, req }: AiInput, uid: () 
       if (!part) continue;
       [start, end, base.partId] = [part.start, part.end, part.id];
     } else if (person.workHours) {
-      [start, end] = [person.workHours.start, person.workHours.end];
+      const w = person.workHours[dayIndex(a.date)];
+      if (!w) continue;
+      [start, end] = [w.start, w.end];
     } else {
       if (!HHMM.test(a.start) || !HHMM.test(a.end)) continue;
       [start, end] = [fromMin(snap(toMin(a.start))), fromMin(snap(toMin(a.end)))];

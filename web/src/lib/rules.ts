@@ -85,6 +85,19 @@ export function canWork(st: Staff, store: Store, s: Pick<Shift, 'date' | 'start'
   return true;
 }
 
+/** 직원 고정 근무를 한 달 날짜에 깐다. 영업시간 밖이면 뺀다 */
+export function fixedShifts(store: Store, staff: Staff[], dates: string[], uid: () => string): Shift[] {
+  return staff.flatMap((st) =>
+    dates.flatMap((date) => {
+      const w = st.employmentType === 'FULL_TIME' ? st.workHours?.[dayIndex(date)] : null;
+      const h = hoursOn(store, date);
+      if (!w || toMin(w.start) < toMin(h.open) || toMin(w.end) > toMin(h.close)) return [];
+      const base: Shift = { id: uid(), staffId: st.id, date, start: '', end: '', partId: null, breakStart: null, breakMinutes: 0, tentative: false };
+      return [withTimes(base, w.start, w.end)];
+    }),
+  );
+}
+
 /** 그 날의 영업시간 (평일 / 주말·공휴일) */
 export const hoursOn = (store: Store, date: string) =>
   isWeekendOrHoliday(date) ? { open: store.weekendOpen, close: store.weekendClose } : { open: store.open, close: store.close };

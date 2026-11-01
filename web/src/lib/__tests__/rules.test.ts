@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { seedStaff, seedStore, seedWeek as seedSchedule } from './fixtures';
+import { SEED_WEEK, seedStaff, seedStore, seedWeek as seedSchedule } from './fixtures';
 import type { Shift } from '../../types';
-import { canWork, gaps, hoursOn, minBreakFor, requiredBreak, validate, withTimes } from '../rules';
+import { canWork, fixedShifts, gaps, hoursOn, minBreakFor, requiredBreak, validate, withTimes } from '../rules';
 import { storeError } from '../../pages/Settings';
-import { datesBetween, monthEnd, weekDates, weeksOf } from '../time';
+import { datesBetween, monthEnd, toMin, weekDates, weeksOf } from '../time';
+import { autoFill } from '../autofill';
 
 const dates = weekDates(seedSchedule.periodStart);
 const FRI = '2026-11-06';
@@ -115,5 +116,51 @@ describe('근무 가능 파트 (R-01)', () => {
   });
   it('직원은 언제나 가능', () => {
     expect(canWork(seedStaff[0], seedStore, { date: sat, start: '06:00', end: '23:00', partId: null })).toBe(true);
+  });
+});
+
+describe('fixedShifts', () => {
+  it('직원 고정 근무를 요일별로 깔고 쉬는 날·알바생은 뺀다', () => {
+    // 월 10–19, 수 13–22, 나머지 쉼
+    const workHours = [{ start: '10:00', end: '19:00' }, null, { start: '13:00', end: '22:00' }, null, null, null, null];
+    const staff = seedStaff.map((s) => (s.id === 1 ? { ...s, workHours } : s));
+    let n = 0;
+    const out = fixedShifts(seedStore, staff, weekDates(SEED_WEEK), () => `t${++n}`);
+    expect(out.map((s) => [s.staffId, s.date, s.start, s.end])).toEqual([
+      [1, '2026-11-02', '10:00', '19:00'],
+      [1, '2026-11-04', '13:00', '22:00'],
+    ]);
+    expect(out[0].breakStart).not.toBeNull();
+  });
+});
+
+describe('autoFill', () => {
+  const dates = weekDates(SEED_WEEK);
+  let n = 0;
+  const out = autoFill(seedStore, seedStaff, dates, [], [], () => `a${++n}`);
+  const byStaff = (id: number) => out.filter((s) => s.staffId === id);
+
+  it('알바생을 근무 가능 파트에만, 하루 한 번만 넣는다', () => {
+    expect(out.some((s) => s.partId)).toBe(true);
+    for (const s of out.filter((x) => x.partId)) {
+      const st = seedStaff.find((x) => x.id === s.staffId)!;
+      expect(canWork(st, seedStore, s)).toBe(true);
+    }
+    expect(new Set(out.map((s) => `${s.staffId}|${s.date}`)).size).toBe(out.length);
+  });
+
+  it('있는 근무는 그대로 두고, 연차인 날은 넣지 않는다', () => {
+    const kept = seedSchedule.shifts.slice(0, 3);
+    const leave = { id: 'l', staffId: 3, date: dates[1], type: 'ANNUAL' as const };
+    const res = autoFill(seedStore, seedStaff, dates, kept, [leave], () => `b${++n}`);
+    expect(res.slice(0, 3)).toEqual(kept);
+    expect(res.some((s) => s.staffId === 3 && s.date === dates[1])).toBe(false);
+  });
+
+  it('희망 주간 상한을 넘기지 않는다', () => {
+    for (const st of seedStaff.filter((s) => s.employmentType === 'PART_TIME')) {
+      const min = byStaff(st.id).reduce((a, s) => a + toMin(s.end) - toMin(s.start) - s.breakMinutes, 0);
+      expect(min).toBeLessThanOrEqual(st.preferredWeeklyHours![1] * 60);
+    }
   });
 });
