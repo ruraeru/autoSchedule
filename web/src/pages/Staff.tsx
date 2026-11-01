@@ -2,12 +2,15 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../api';
 import { keys, useStaff, useStore } from '../api/queries';
+import Icon from '../components/Icon';
 import PageHeader from '../components/PageHeader';
 import { Avatar, Badge, Button, Card, cx, Field, inputBase, inputClass, Loading, Segmented } from '../components/ui';
 import { DAY_LABELS } from '../lib/time';
 import type { EmploymentType, Part, Staff, WorkTime } from '../types';
 
 type Filter = 'ALL' | EmploymentType;
+
+const PART_TONE: Record<string, string> = { open: 'bg-open-bg text-open', middle: 'bg-middle-bg text-middle', close: 'bg-close-bg text-close', staff: 'bg-staff-bg text-staff' };
 
 const DEFAULT_TIME: WorkTime = { start: '09:00', end: '18:00' };
 // 기본은 월~금 09–18
@@ -44,7 +47,8 @@ export default function StaffPage() {
         sub="직원은 계약 주 근로시간 안에서 출근 시간을 유동 배치하고, 알바생은 파트 단위로 배치합니다."
         actions={
           <Button variant="primary" onClick={() => setEditing(blank(filter === 'FULL_TIME' ? 'FULL_TIME' : 'PART_TIME'))}>
-            + 구성원 추가
+            <Icon name="plus" />
+            구성원 추가
           </Button>
         }
       />
@@ -63,33 +67,32 @@ export default function StaffPage() {
       <div className={cx('grid items-start gap-4', editing && 'xl:grid-cols-[1fr_420px]')}>
         <Card className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
-            <thead className="border-b border-line bg-bg/60 text-left text-xs text-muted">
+            <thead className="border-b border-line text-left text-xs text-muted">
               <tr>
-                <th className="px-4 py-3 font-medium">이름</th>
-                <th className="px-4 py-3 font-medium">고용 형태</th>
-                <th className="px-4 py-3 font-medium">시급</th>
-                <th className="px-4 py-3 font-medium">주 근로시간</th>
-                <th className="px-4 py-3 font-medium">연락처</th>
+                <th className="px-4 py-3 font-normal">이름</th>
+                <th className="px-4 py-3 font-normal">고용 형태</th>
+                <th className="px-4 py-3 text-right font-normal">시급</th>
+                <th className="px-4 py-3 text-right font-normal">주 근로시간</th>
+                <th className="px-4 py-3 font-normal">연락처</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
               {list.map((s) => (
-                <tr key={s.id} onClick={() => setEditing(structuredClone(s))} className={cx('cursor-pointer hover:bg-bg', editing?.id === s.id && 'bg-brand-subtle/50')}>
+                <tr key={s.id} onClick={() => setEditing(structuredClone(s))} className={cx('cursor-pointer hover:bg-bg', editing?.id === s.id && 'bg-brand-subtle')}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
-                      <Avatar name={s.name} fullTime={s.employmentType === 'FULL_TIME'} />
+                      <Avatar name={s.name} id={s.id} />
                       <span className="font-medium">{s.name}</span>
-                      {s.isMinor && <Badge tone="warning">연소자</Badge>}
+                      {s.isMinor && <Badge>연소자</Badge>}
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <Badge tone={s.employmentType === 'FULL_TIME' ? 'staff' : 'brand'}>
-                      {s.employmentType === 'FULL_TIME' ? `직원 · ${s.title}` : '알바 · 파트 근무'}
-                    </Badge>
+                    {s.employmentType === 'FULL_TIME' ? <Badge tone="staff">직원 · {s.title}</Badge> : <span className="text-muted">알바 · 파트 근무</span>}
                   </td>
-                  <td className="px-4 py-3">{s.hourlyWage.toLocaleString()}원</td>
-                  <td className="px-4 py-3">
-                    {s.employmentType === 'FULL_TIME' ? `계약 ${s.contractWeeklyHours}h` : `희망 ${s.preferredWeeklyHours?.join('–')}h`}
+                  <td className="px-4 py-3 text-right tabular-nums">{s.hourlyWage.toLocaleString()}원</td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    <span className="text-xs text-muted">{s.employmentType === 'FULL_TIME' ? '계약 ' : '희망 '}</span>
+                    {s.employmentType === 'FULL_TIME' ? `${s.contractWeeklyHours}h` : `${s.preferredWeeklyHours?.join('–')}h`}
                   </td>
                   <td className="px-4 py-3 text-muted">{s.phone}</td>
                 </tr>
@@ -146,7 +149,7 @@ function StaffForm({ initial, parts, minWage, onClose }: { initial: Staff; parts
       <div className="flex items-center justify-between">
         <h2 className="font-bold">{s.id ? `${initial.name} 정보` : '구성원 추가'}</h2>
         <button onClick={onClose} className="text-muted hover:text-ink" aria-label="닫기">
-          ✕
+          <Icon name="x" size={18} />
         </button>
       </div>
       <Segmented<EmploymentType>
@@ -222,7 +225,7 @@ function StaffForm({ initial, parts, minWage, onClose }: { initial: Staff; parts
                     onClick={() => setDay(di, w ? null : { ...prevTime(di) })}
                     aria-pressed={!!w}
                     aria-label={`${d}요일 근무`}
-                    className={cx('h-8 w-9 shrink-0 rounded-md text-xs', w ? 'bg-staff/80 font-medium text-white' : 'bg-bg text-muted hover:bg-line')}
+                    className={cx('h-8 w-9 shrink-0 rounded-md text-xs', w ? 'bg-staff-bg font-medium text-staff' : 'bg-brand-subtle text-muted hover:bg-line')}
                   >
                     {d}
                   </button>
@@ -255,7 +258,7 @@ function StaffForm({ initial, parts, minWage, onClose }: { initial: Staff; parts
               ))}
               {parts.map((p) => (
                 <div key={p.id} className="contents">
-                  <button onClick={() => togglePart(p.id)} className="pr-2 text-left text-xs leading-tight hover:text-brand">
+                  <button onClick={() => togglePart(p.id)} className="pr-2 text-left text-xs leading-tight hover:underline">
                     <span className="font-medium">{p.name}</span>
                     <br />
                     <span className="text-[11px] text-muted">
@@ -270,9 +273,9 @@ function StaffForm({ initial, parts, minWage, onClose }: { initial: Staff; parts
                         onClick={() => toggle(di, p.id)}
                         aria-label={`${d} ${p.name}`}
                         aria-pressed={on}
-                        className={cx('h-7 rounded-md text-xs', on ? 'bg-brand/70 font-medium text-white' : 'bg-bg text-muted hover:bg-line')}
+                        className={cx('grid h-[30px] place-items-center rounded-md text-xs', on ? PART_TONE[p.tone] : 'bg-brand-subtle text-muted hover:bg-line')}
                       >
-                        {on ? '✓' : ''}
+                        {on && <Icon name="check" size={14} />}
                       </button>
                     );
                   })}

@@ -18,7 +18,7 @@ export default function MonthView({ schedule, staff, store, onDate }: { schedule
 
   return (
     <div className="min-w-[840px]">
-      <div className="grid grid-cols-7 border-b border-line bg-bg/60 text-center text-xs text-muted">
+      <div className="grid grid-cols-7 border-b border-line text-center text-xs text-muted">
         {DAY_LABELS.map((d) => (
           <div key={d} className="py-2">
             {d}

@@ -102,7 +102,7 @@ export default function DayView({ schedule, staff, store, dates, date, onDate, o
             key={d}
             onClick={() => onDate(d)}
             className={cx(
-              'relative h-9 shrink-0 rounded-lg px-3.5 text-[13px]',
+              'relative h-9 shrink-0 rounded-full px-3.5 text-[13px]',
               d === date ? 'bg-ink font-medium text-white' : 'border border-line bg-surface text-muted hover:text-ink',
             )}
           >
@@ -113,7 +113,7 @@ export default function DayView({ schedule, staff, store, dates, date, onDate, o
 
       <Card className="overflow-x-auto">
         <div className="min-w-[860px]" onPointerMove={move} onPointerUp={end} onPointerCancel={end}>
-          <div className="grid grid-cols-[168px_1fr] border-b border-line bg-bg/60">
+          <div className="grid grid-cols-[168px_1fr] border-b border-line">
             <div className="px-4 py-2.5 text-xs text-muted">구성원</div>
             <div className="relative h-9">
               {hoursTicks.slice(0, -1).map((h) => (
@@ -131,7 +131,7 @@ export default function DayView({ schedule, staff, store, dates, date, onDate, o
             return (
               <div key={p.id} className="grid grid-cols-[168px_1fr] border-b border-line">
                 <div className="flex items-center gap-2 px-4 py-2">
-                  <Avatar name={p.name} fullTime={p.employmentType === 'FULL_TIME'} />
+                  <Avatar name={p.name} id={p.id} />
                   <div className="min-w-0 leading-tight">
                     <div className="text-sm font-bold">{p.name}</div>
                     <div className="text-[11px] text-muted">

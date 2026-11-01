@@ -45,7 +45,7 @@ export default function CreateSchedule() {
           </div>
         </Section>
         <Section title="시작 내용">
-          <label className="flex items-start gap-2.5 rounded-lg border border-line p-4">
+          <label className="flex items-start gap-2.5 rounded-[10px] border border-line-strong p-4">
             <input type="checkbox" className="mt-0.5 size-4 accent-brand" checked={prefill} onChange={(e) => setPrefill(e.target.checked)} />
             <span>
               <span className="block text-sm font-bold">직원 고정 근무 미리 넣기</span>
@@ -55,7 +55,7 @@ export default function CreateSchedule() {
             </span>
           </label>
         </Section>
-        {draft && <p className="text-sm text-warning">{monthLabel(month)}에 작성 중인 근무표가 있어요. 만들면 새 근무표로 바뀝니다.</p>}
+        {draft && <p className="rounded-[10px] bg-danger-subtle px-4 py-3 text-sm text-danger">{monthLabel(month)}에 작성 중인 근무표가 있어요. 만들면 새 근무표로 바뀝니다.</p>}
         {create.error && <p className="text-sm text-danger">만들기 실패: {create.error.message}</p>}
         <div className="flex justify-end">
           <Button variant="primary" onClick={submit} disabled={create.isPending}>

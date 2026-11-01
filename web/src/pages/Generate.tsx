@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { keys, useStaff, useStore } from '../api/queries';
+import Icon from '../components/Icon';
 import PageHeader from '../components/PageHeader';
 import { Button, Card, cx, Loading } from '../components/ui';
 import { addMonths, md, monthEnd, monthLabel, monthOf, ymd } from '../lib/time';
@@ -23,9 +24,13 @@ export function Choice({ active, onClick, title, desc }: { active: boolean; onCl
     <button
       type="button"
       onClick={onClick}
-      className={cx('rounded-lg border p-4 text-left', active ? 'border-brand bg-brand-subtle ring-1 ring-brand' : 'border-line hover:bg-bg')}
+      aria-pressed={active}
+      className={cx('rounded-[10px] border bg-surface px-4 py-3.5 text-left', active ? 'border-ink ring-[0.5px] ring-ink' : 'border-line-strong hover:bg-bg')}
     >
-      <div className="text-sm font-bold">{title}</div>
+      <div className="flex items-center justify-between gap-2 text-sm font-medium">
+        {title}
+        {active && <Icon name="check" />}
+      </div>
       <div className="mt-1 text-xs text-muted">{desc}</div>
     </button>
   );
@@ -88,7 +93,7 @@ export default function Generate() {
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round(pct)}
-            className="h-2 overflow-hidden rounded-full bg-bg"
+            className="h-1.5 overflow-hidden rounded-full bg-brand-subtle"
           >
             <div className="h-full rounded-full bg-brand transition-[width] duration-500 ease-out" style={{ width: `${pct}%` }} />
           </div>
@@ -105,10 +110,10 @@ export default function Generate() {
               <span
                 className={cx(
                   'grid size-6 place-items-center rounded-full text-xs',
-                  i < step ? 'bg-success text-white' : i === step ? 'animate-pulse bg-brand text-white' : 'bg-bg',
+                  i < step ? 'bg-brand-subtle text-ink' : i === step ? 'animate-pulse bg-ink text-white' : 'border-[1.5px] border-line-strong',
                 )}
               >
-                {i < step ? '✓' : i + 1}
+                {i < step ? <Icon name="check" size={14} /> : i === step ? <span className="size-1.5 rounded-full bg-white" /> : null}
               </span>
               {s}
             </li>
@@ -141,7 +146,7 @@ export default function Generate() {
           </div>
         </Section>
         <Section title={`직원 (${fullTime.length}명 · 유동 근무)`}>
-          <label className="flex items-start gap-2.5 rounded-lg border border-line p-4">
+          <label className="flex items-start gap-2.5 rounded-[10px] border border-line-strong p-4">
             <input type="checkbox" className="mt-0.5 size-4 accent-brand" checked={req.fillContractHours} onChange={(e) => set({ fillContractHours: e.target.checked })} />
             <span>
               <span className="block text-sm font-bold">계약 근로시간을 먼저 채우기</span>

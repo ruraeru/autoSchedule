@@ -42,7 +42,7 @@ export default function PersonView({ schedule, staff, store, v, dates, onOpen }:
     return (
       <div key={p.id} className={cx('grid border-b border-line', GRID_COLS)}>
         <div className="flex items-center gap-2.5 px-4 py-2">
-          <Avatar name={p.name} fullTime={isFull} />
+          <Avatar name={p.name} id={p.id} />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-sm font-bold">{p.name}</span>

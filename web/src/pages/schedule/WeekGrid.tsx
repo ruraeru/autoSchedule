@@ -13,10 +13,10 @@ export const OutCell = () => <div className="border-l border-line bg-bg/60" />;
 
 export function DayHeader({ dates, first }: { dates: (string | null)[]; first: string }) {
   return (
-    <div className={cx('grid border-b border-line bg-bg/60 text-sm', GRID_COLS)}>
+    <div className={cx('grid border-b border-line text-sm', GRID_COLS)}>
       <div className="px-4 py-3 text-xs text-muted">{first}</div>
       {dates.map((d, i) => (
-        <div key={i} className={cx('py-3 text-center font-bold', i >= 5 && 'text-brand', !d && 'text-muted/50')}>
+        <div key={i} className={cx('py-3 text-center font-bold', i >= 5 && 'text-muted', !d && 'text-muted/50')}>
           {DAY_LABELS[i]} {d && md(d)}
         </div>
       ))}
@@ -26,7 +26,7 @@ export function DayHeader({ dates, first }: { dates: (string | null)[]; first: s
 
 export function GroupHeader({ title, sub }: { title: string; sub: string }) {
   return (
-    <div className="border-b border-line bg-bg/60 px-4 py-2 text-xs">
+    <div className="border-b border-line px-4 py-2 text-xs">
       <b className="text-[13px]">{title}</b>
       <span className="ml-2 text-muted">{sub}</span>
     </div>

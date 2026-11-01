@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../api';
 import { keys, useSchedule, useSchedules, useStaff, useStore } from '../../api/queries';
+import Icon from '../../components/Icon';
 import PageHeader from '../../components/PageHeader';
 import { Badge, Button, Card, cx, Loading, Segmented } from '../../components/ui';
 import { autoFill } from '../../lib/autofill';
@@ -139,18 +140,18 @@ export default function ScheduleEditor() {
                 disabled={!monthSchedule(n)}
                 aria-label={n < 0 ? '전월 근무표' : '익월 근무표'}
                 title={monthSchedule(n) ? monthLabel(addMonths(draft.periodStart, n)) : `${monthLabel(addMonths(draft.periodStart, n))} 근무표 없음`}
-                className={cx('grid size-8 place-items-center rounded-lg text-lg text-muted hover:bg-bg hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent', n > 0 && 'order-last')}
+                className={cx('grid size-8 place-items-center rounded-full text-ink hover:bg-bg disabled:opacity-30 disabled:hover:bg-transparent', n > 0 && 'order-last')}
               >
-                {n < 0 ? '‹' : '›'}
+                <Icon name={n < 0 ? 'chevron-left' : 'chevron-right'} />
               </button>
             ))}
-            <span>근무표 · {monthLabel(draft.periodStart)}</span>
+            <span>{monthLabel(draft.periodStart)} 근무표</span>
           </span>
         }
         badges={
           <>
             {draft.status === 'CONFIRMED' && <Badge tone="success">확정됨</Badge>}
-            {v.tentativeCount > 0 && <Badge tone="warning">미정 {v.tentativeCount}건</Badge>}
+            {v.tentativeCount > 0 && <Badge tone="danger">미정 {v.tentativeCount}건</Badge>}
             {dirty && <Badge>저장 안 됨</Badge>}
           </>
         }
@@ -178,11 +179,11 @@ export default function ScheduleEditor() {
             >
               자동 채우기
             </Button>
-            <Button variant="ghost" size="sm" onClick={undo} disabled={!past.length} title="실행 취소 (⌘Z)">
-              ↶
+            <Button variant="ghost" size="sm" onClick={undo} disabled={!past.length} title="실행 취소 (⌘Z)" aria-label="실행 취소" className="w-8 px-0">
+              <Icon name="undo" />
             </Button>
-            <Button variant="ghost" size="sm" onClick={redo} disabled={!future.length} title="다시 실행 (⇧⌘Z)">
-              ↷
+            <Button variant="ghost" size="sm" onClick={redo} disabled={!future.length} title="다시 실행 (⇧⌘Z)" aria-label="다시 실행" className="w-8 px-0">
+              <Icon name="redo" />
             </Button>
             <Button onClick={() => save.mutate()} disabled={!dirty || save.isPending}>
               {save.isPending ? '저장 중…' : '저장'}
@@ -249,7 +250,7 @@ export default function ScheduleEditor() {
       {(save.error || confirm.error) && <p className="mt-3 text-sm text-danger">{String((save.error ?? confirm.error)!.message)}</p>}
       {draft.status === 'CONFIRMED' && (
         <p className="mt-3 text-sm text-muted">
-          확정된 근무표입니다. 수정 후 저장하면 변경 내역이 반영됩니다. <Link to="/schedules" className="text-brand">목록으로</Link>
+          확정된 근무표입니다. 수정 후 저장하면 변경 내역이 반영됩니다. <Link to="/schedules" className="underline underline-offset-2">목록으로</Link>
         </p>
       )}
     </div>
@@ -258,19 +259,19 @@ export default function ScheduleEditor() {
 
 function Legend() {
   const items: [string, string][] = [
-    ['bg-open', '오픈'],
-    ['bg-middle', '미들'],
-    ['bg-close', '마감'],
-    ['bg-staff', '직원 근무'],
+    ['bg-open-bg', '오픈'],
+    ['bg-middle-bg', '미들'],
+    ['bg-close-bg', '마감'],
+    ['bg-staff-bg', '직원 근무'],
     ['border-[1.5px] border-dashed border-staff', '시간 미정'],
-    ['bg-muted/50', '연차·휴무'],
+    ['bg-brand-subtle', '연차·휴무'],
   ];
   return (
     <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
       <div className="flex flex-wrap gap-4">
         {items.map(([c, l]) => (
           <span key={l} className="flex items-center gap-1.5">
-            <span className={cx('size-2.5 rounded-sm', c)} />
+            <span className={cx('size-3 rounded', c)} />
             {l}
           </span>
         ))}

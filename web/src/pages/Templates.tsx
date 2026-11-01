@@ -47,9 +47,9 @@ export default function Templates() {
         {data.length === 0 && <p className="p-8 text-center text-sm text-muted">저장된 템플릿이 없습니다.</p>}
         <ul className="divide-y divide-line">
           {data.map((t) => (
-            <li key={t.id} className="flex items-center gap-3 px-5 py-4">
+            <li key={t.id} className="flex items-center gap-2 px-6 py-4">
               <div className="flex-1">
-                <div className="font-bold">{t.name}</div>
+                <div className="text-sm font-medium">{t.name}</div>
                 <div className="text-xs text-muted">
                   근무 {t.shifts.length}건 · 직원 유동 근무 {t.shifts.filter((s) => !s.partId).length}건 · 연차 {t.leaves.length}건
                 </div>
@@ -57,7 +57,7 @@ export default function Templates() {
               <Button size="sm" variant="ghost" onClick={() => remove.mutate(t.id)}>
                 삭제
               </Button>
-              <Button size="sm" variant="primary" onClick={() => apply.mutate(t.id)} disabled={apply.isPending}>
+              <Button size="sm" onClick={() => apply.mutate(t.id)} disabled={apply.isPending}>
                 적용
               </Button>
             </li>

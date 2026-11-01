@@ -52,11 +52,11 @@ export default function PartView({ schedule, staff, store, dates, onOpen }: Prop
             <div className="flex items-center gap-2.5 px-4 py-3">
               <span
                 className={cx(
-                  'h-8 w-1 rounded-full',
-                  r.tone === 'open' && 'bg-open',
-                  r.tone === 'middle' && 'bg-middle',
-                  r.tone === 'close' && 'bg-close',
-                  r.tone === 'staff' && 'bg-staff',
+                  'size-3 shrink-0 rounded border',
+                  r.tone === 'open' && 'border-open bg-open-bg',
+                  r.tone === 'middle' && 'border-middle bg-middle-bg',
+                  r.tone === 'close' && 'border-close bg-close-bg',
+                  r.tone === 'staff' && 'border-staff bg-staff-bg',
                 )}
               />
               <div>

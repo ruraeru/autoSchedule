@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { auth } from '../api/auth';
+import { Mark } from '../components/Icon';
 import { Button, Card, Field, inputClass } from '../components/ui';
 import { useAuth } from '../store/auth';
 
@@ -36,7 +37,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
     <div className="grid min-h-screen place-items-center bg-bg px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-lg bg-brand font-bold text-white">오</span>
+          <Mark size={36} />
           <span className="text-lg font-bold">오토스케줄</span>
         </div>
         <Card className="p-6">
@@ -71,7 +72,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
         </Card>
         <p className="mt-4 text-center text-sm text-muted">
           {signup ? '이미 계정이 있나요? ' : '처음이신가요? '}
-          <Link to={signup ? '/login' : '/signup'} state={{ from }} className="font-medium text-brand">
+          <Link to={signup ? '/login' : '/signup'} state={{ from }} className="font-medium text-ink underline underline-offset-2">
             {signup ? '로그인' : '회원가입'}
           </Link>
         </p>

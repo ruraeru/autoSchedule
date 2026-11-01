@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useSchedules } from '../api/queries';
+import Icon from '../components/Icon';
 import PageHeader from '../components/PageHeader';
 import { Badge, Button, Card, Loading } from '../components/ui';
 import { md, monthLabel } from '../lib/time';
@@ -30,14 +31,22 @@ export default function Schedules() {
         <ul className="divide-y divide-line">
           {data.map((s) => (
             <li key={s.id}>
-              <Link to={`/schedules/${s.id}`} className="flex items-center gap-3 px-5 py-4 hover:bg-bg">
+              <Link to={`/schedules/${s.id}`} className="flex items-center gap-3 px-6 py-4 hover:bg-bg">
                 <div className="flex-1">
-                  <div className="font-bold">{monthLabel(s.periodStart)}</div>
+                  <div className="text-sm font-medium">{monthLabel(s.periodStart)}</div>
                   <div className="text-xs text-muted">
                     {md(s.periodStart)} – {md(s.periodEnd)} · 근무 {s.shifts.length}건 · {SOURCE[s.source]}
                   </div>
                 </div>
-                <Badge tone={s.status === 'CONFIRMED' ? 'success' : 'neutral'}>{s.status === 'CONFIRMED' ? '확정' : '작성 중'}</Badge>
+                {s.status === 'CONFIRMED' ? (
+                  <span className="flex items-center gap-1 text-xs font-medium text-success">
+                    <Icon name="check" size={14} />
+                    확정
+                  </span>
+                ) : (
+                  <Badge>작성 중</Badge>
+                )}
+                <Icon name="chevron-right" className="text-muted" />
               </Link>
             </li>
           ))}
