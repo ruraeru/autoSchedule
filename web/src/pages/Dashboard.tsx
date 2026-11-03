@@ -97,7 +97,8 @@ export default function Dashboard() {
           <div className="divide-y divide-line">
             {fullTime.map((p) => {
               const w = v.weeks.get(days[0])!.get(p.id)!;
-              const contract = (p.contractWeeklyHours ?? 40) * 60;
+              // 게이지 기준: 법정 주 40시간
+              const contract = 40 * 60;
               const seg = (m: number) => `${Math.min(100, (m / contract) * 100)}%`;
               return (
                 <div key={p.id} className="grid items-center gap-4 px-6 py-4 lg:grid-cols-[240px_1fr_120px] lg:gap-6">
@@ -111,7 +112,7 @@ export default function Dashboard() {
                       <div className="text-xs text-muted">
                         {w.tentativeMin || w.leaveMin
                           ? [`확정 ${hours(w.workMin)}`, w.tentativeMin && `미정 ${hours(w.tentativeMin)}`, w.leaveMin && `연차 ${hours(w.leaveMin)}`].filter(Boolean).join(' · ')
-                          : `계약 ${p.contractWeeklyHours}h`}
+                          : `확정 ${hours(w.workMin)}`}
                       </div>
                     </div>
                   </div>
@@ -136,7 +137,7 @@ export default function Dashboard() {
                   <div className="lg:text-right">
                     <div className="tabular-nums">
                       <span className="text-xl font-medium">{hours(w.workMin + w.tentativeMin + w.leaveMin)}</span>
-                      <span className="text-xs text-muted"> / {p.contractWeeklyHours}h</span>
+                      <span className="text-xs text-muted"> / 40h</span>
                     </div>
                     <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-brand-subtle">
                       <span className="bg-staff" style={{ width: seg(w.workMin) }} />

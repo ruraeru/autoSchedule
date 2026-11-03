@@ -1,5 +1,5 @@
 // 클라이언트 미리보기용 규칙 엔진 (PRD §7). 확정 전 최종 검증은 서버가 같은 규칙으로 다시 한다.
-import type { Issue, Schedule, Shift, Staff, Store } from '../types';
+import type { Issue, Part, Schedule, Shift, Staff, Store } from '../types';
 import { dayIndex, dayLabel, fromMin, hours, isWeekendOrHoliday, snap, toMin, weeksOf } from './time';
 
 export const SLOT = 30;
@@ -19,6 +19,10 @@ export const workMin = (s: Shift) => durationMin(s) - s.breakMinutes;
 /** 근로기준법 제54조: 4시간 이상 30분, 8시간 이상 1시간 */
 export const requiredBreak = (work: number) => (work >= 480 ? 60 : work >= 240 ? 30 : 0);
 
+// shortcut: 상시 근로자 수를 등록 구성원 수로 본다. 법은 직전 1개월 평균 인원이라 백엔드가 생기면 근무 기록으로 계산한다
+export const sizeOf = (sizeMode: Store['sizeMode'], staffCount: number): Store['size'] =>
+  sizeMode !== 'AUTO' ? sizeMode : staffCount >= 5 ? 'OVER_5' : 'UNDER_5';
+
 /** 체류 시간(출근~퇴근)에 필요한 최소 휴게 */
 export const minBreakFor = (duration: number) => [0, 30, 60].find((b) => b >= requiredBreak(duration - b)) ?? 60;
 
@@ -36,9 +40,12 @@ export function placeBreak(s: Shift): Shift {
   return { ...s, breakStart: fromMin(Math.min(Math.max(st, lo), hi)) };
 }
 
-/** 출퇴근 시각을 바꾸고 법정 최소 휴게를 다시 반영한다 */
-export const withTimes = (s: Shift, start: string, end: string): Shift =>
-  placeBreak({ ...s, start, end, breakMinutes: minBreakFor(toMin(end) - toMin(start)) });
+/** 파트 휴게 기본값: 근무 4시간마다 30분 */
+export const partBreakFor = (duration: number) => Math.floor(duration / 240) * 30;
+
+/** 출퇴근 시각을 바꾸고 휴게를 다시 반영한다. 휴게를 안 주면 법정 최소 */
+export const withTimes = (s: Shift, start: string, end: string, breakMinutes = minBreakFor(toMin(end) - toMin(start))): Shift =>
+  placeBreak({ ...s, start, end, breakMinutes });
 
 export function breakRange(s: Shift): [number, number] | null {
   if (!s.breakMinutes || !s.breakStart) return null;
@@ -61,14 +68,12 @@ export interface Slot {
   present: number;
 }
 
-export function requiredAt(store: Store, date: string, t: number) {
-  const day = dayIndex(date);
-  return Math.max(
-    0,
-    ...store.demand
-      .filter((d) => (!d.days || d.days.includes(day)) && toMin(d.start) <= t && t < toMin(d.end))
-      .map((d) => d.required),
-  );
+/** 시작 시각 순(같으면 끝나는 시각 순) */
+export const sortParts = (parts: Part[]) => [...parts].sort((a, b) => toMin(a.start) - toMin(b.start) || toMin(a.end) - toMin(b.end));
+
+/** t분에 필요한 인원: 그 시각을 덮는 파트들의 필요 인원 합 */
+export function requiredAt(store: Store, t: number) {
+  return store.parts.filter((p) => toMin(p.start) <= t && t < toMin(p.end)).reduce((a, p) => a + p.required, 0);
 }
 
 /**
@@ -78,22 +83,26 @@ export function requiredAt(store: Store, date: string, t: number) {
 export function canWork(st: Staff, store: Store, s: Pick<Shift, 'date' | 'start' | 'end' | 'partId'>) {
   if (st.employmentType === 'FULL_TIME') return true;
   const ids = st.availableParts[dayIndex(s.date)] ?? [];
-  if (s.partId) return ids.includes(s.partId);
   const parts = store.parts.filter((p) => ids.includes(p.id));
+  if (s.partId) return parts.some((p) => p.id === s.partId);
   for (let t = toMin(s.start); t < toMin(s.end); t += 15)
     if (!parts.some((p) => toMin(p.start) <= t && t < toMin(p.end))) return false;
   return true;
 }
 
-/** 직원 고정 근무를 한 달 날짜에 깐다. 영업시간 밖이면 뺀다 */
+/** 고정 근무를 한 달 날짜에 깐다. 직원은 요일별 시각(영업시간 밖이면 뺀다), 알바생은 그 요일에 고른 파트마다 */
 export function fixedShifts(store: Store, staff: Staff[], dates: string[], uid: () => string): Shift[] {
   return staff.flatMap((st) =>
     dates.flatMap((date) => {
-      const w = st.employmentType === 'FULL_TIME' ? st.workHours?.[dayIndex(date)] : null;
+      const base = { staffId: st.id, date, start: '', end: '', partId: null, breakStart: null, breakMinutes: 0, tentative: false };
+      if (st.employmentType === 'PART_TIME') {
+        const ids = st.availableParts[dayIndex(date)] ?? [];
+        return store.parts.filter((p) => ids.includes(p.id)).map((p) => withTimes({ ...base, id: uid(), partId: p.id }, p.start, p.end, p.breakMinutes));
+      }
+      const w = st.workHours?.[dayIndex(date)];
       const h = hoursOn(store, date);
       if (!w || toMin(w.start) < toMin(h.open) || toMin(w.end) > toMin(h.close)) return [];
-      const base: Shift = { id: uid(), staffId: st.id, date, start: '', end: '', partId: null, breakStart: null, breakMinutes: 0, tentative: false };
-      return [withTimes(base, w.start, w.end)];
+      return [withTimes({ ...base, id: uid() }, w.start, w.end)];
     }),
   );
 }
@@ -102,17 +111,11 @@ export function fixedShifts(store: Store, staff: Staff[], dates: string[], uid: 
 export const hoursOn = (store: Store, date: string) =>
   isWeekendOrHoliday(date) ? { open: store.weekendOpen, close: store.weekendClose } : { open: store.open, close: store.close };
 
-/** 평일·주말을 모두 덮는 시각 범위(분) */
-export const hoursSpan = (store: Store) => ({
-  open: Math.min(toMin(store.open), toMin(store.weekendOpen)),
-  close: Math.max(toMin(store.close), toMin(store.weekendClose)),
-});
-
 export function coverage(store: Store, date: string, dayShifts: Shift[]): Slot[] {
   const slots: Slot[] = [];
   const { open, close } = hoursOn(store, date);
   for (let t = toMin(open); t < toMin(close); t += SLOT) {
-    slots.push({ t, required: requiredAt(store, date, t), present: dayShifts.filter((s) => isWorking(s, t)).length });
+    slots.push({ t, required: requiredAt(store, t), present: dayShifts.filter((s) => isWorking(s, t)).length });
   }
   return slots;
 }
@@ -247,18 +250,9 @@ export function validate(schedule: Schedule, staffList: Staff[], store: Store, d
         add({ ruleId: 'R-05', severity: 'error', message: `${st.name} 연소자 주 35시간 초과 (${hours(total)})` });
       if (over5 && w.overtimeMin > OVERTIME_LIMIT)
         add({ ruleId: 'R-03', severity: 'error', message: `${st.name} 주 연장근로 12시간 초과 (${hours(w.overtimeMin)})` });
-      if (st.employmentType === 'FULL_TIME' && st.contractWeeklyHours && total + w.leaveMin < st.contractWeeklyHours * 60)
-        add({
-          ruleId: 'S-07',
-          severity: 'warning',
-          message: `${st.name} 계약 ${st.contractWeeklyHours}h 중 ${hours(total + w.leaveMin)}만 배정`,
-        });
       if (st.employmentType === 'PART_TIME') {
         if (schedule.policy.weeklyHolidayPay === 'MINIMIZE' && w.weeklyHoliday)
           add({ ruleId: 'S-02', severity: 'warning', message: `${st.name} 주 ${hours(total)} — 주휴수당 발생` });
-        const pref = st.preferredWeeklyHours;
-        if (pref && total > 0 && (total < pref[0] * 60 || total > pref[1] * 60))
-          add({ ruleId: 'S-03', severity: 'warning', message: `${st.name} 희망 ${pref[0]}–${pref[1]}h 범위 밖 (${hours(total)})` });
       }
     }
     if (st.hourlyWage < store.minimumWage)

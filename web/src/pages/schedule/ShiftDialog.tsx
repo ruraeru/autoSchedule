@@ -46,6 +46,7 @@ export default function ShiftDialog({ target, staff, store, onClose }: { target:
     const p = store.parts.find((x) => x.id === id)!;
     setPartId(p.id);
     setTimes(p.start, p.end);
+    setBreakMinutes(p.breakMinutes);
   };
   const valid = mode !== 'work' || toMin(end) > toMin(start);
 
@@ -153,7 +154,7 @@ export default function ShiftDialog({ target, staff, store, onClose }: { target:
           <div className="grid grid-cols-2 gap-3">
             <Field label="휴게" hint={`법정 최소 ${minBreakFor(toMin(end) - toMin(start))}분`}>
               <select className={inputClass} value={breakMinutes} onChange={(e) => setBreakMinutes(Number(e.target.value))}>
-                {[0, 30, 60, 90].map((m) => (
+                {[0, 30, 60, 90, 120].map((m) => (
                   <option key={m} value={m}>
                     {m}분
                   </option>

@@ -14,7 +14,7 @@ const STEPS = ['매장 조건·가능 시간 분석', '직원 출근 시간 배�
 const STEP_AT = [0, 25, 55, 80];
 
 /**
- * shortcut: Gemini는 한 번에 답을 돌려줘서 실제 진행률을 알 수 없다. 걸린 시간으로 추정한다
+ * shortcut: AI는 한 번에 답을 돌려줘서 실제 진행률을 알 수 없다. 걸린 시간으로 추정한다
  * (실측 1~3분: 60초에 약 60%, 2분에 약 82%, 끝나기 전엔 95%를 넘지 않음). 실제 진행률이 필요하면 스트리밍 응답으로 바꾼다.
  */
 const estimate = (sec: number) => 95 * (1 - Math.exp(-sec / 60));
@@ -56,7 +56,6 @@ export default function Generate() {
     periodStart: months[1],
     weeklyHolidayPay: 'MINIMIZE',
     priority: 'FAIRNESS',
-    fillContractHours: true,
   });
   const [elapsed, setElapsed] = useState(0);
 
@@ -84,7 +83,7 @@ export default function Generate() {
   if (gen.isPending)
     return (
       <Card className="mx-auto mt-10 max-w-md p-8">
-        <h1 className="text-lg font-bold">Gemini가 근무표를 만들고 있어요</h1>
+        <h1 className="text-lg font-bold">AI가 근무표를 만들고 있어요</h1>
         <p className="mt-1 text-sm text-muted">{monthLabel(req.periodStart)} · 직원 {fullTime.length}명 · 알바생 {staff.length - fullTime.length}명 · 보통 1~2분 걸려요</p>
         <div className="mt-6">
           <div
@@ -124,7 +123,7 @@ export default function Generate() {
 
   return (
     <div className="max-w-3xl">
-      <PageHeader title="AI 근무표 생성" sub="조건을 고르면 Gemini가 직원과 알바생을 함께 배치합니다. 구성원 이름은 빼고 번호로만 전달합니다." />
+      <PageHeader title="AI 근무표 생성" sub="조건을 고르면 AI가 직원 근무를 정하고 알바생은 고른 파트에 배치합니다. 구성원 이름은 빼고 번호로만 전달합니다." />
       <Card className="space-y-7 p-6">
         <Section title="기간">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -136,7 +135,7 @@ export default function Generate() {
         <Section title="주휴수당">
           <div className="grid gap-2 sm:grid-cols-2">
             <Choice active={req.weeklyHolidayPay === 'MINIMIZE'} onClick={() => set({ weeklyHolidayPay: 'MINIMIZE' })} title="최소화" desc="알바생을 가능하면 주 15시간 미만으로 배치" />
-            <Choice active={req.weeklyHolidayPay === 'ALLOW'} onClick={() => set({ weeklyHolidayPay: 'ALLOW' })} title="허용" desc="희망 근무시간을 우선하고 주휴수당은 계산만" />
+            <Choice active={req.weeklyHolidayPay === 'ALLOW'} onClick={() => set({ weeklyHolidayPay: 'ALLOW' })} title="허용" desc="주휴수당은 피하지 않고 계산만" />
           </div>
         </Section>
         <Section title="우선순위">
@@ -144,17 +143,6 @@ export default function Generate() {
             <Choice active={req.priority === 'FAIRNESS'} onClick={() => set({ priority: 'FAIRNESS' })} title="공평 배분" desc="알바생 간 근무시간 차이를 줄임" />
             <Choice active={req.priority === 'COST'} onClick={() => set({ priority: 'COST' })} title="인건비 절감" desc="필요 인원만큼만 최소 배치" />
           </div>
-        </Section>
-        <Section title={`직원 (${fullTime.length}명 · 유동 근무)`}>
-          <label className="flex items-start gap-2.5 rounded-[10px] border border-line-strong p-4">
-            <input type="checkbox" className="mt-0.5 size-4 accent-brand" checked={req.fillContractHours} onChange={(e) => set({ fillContractHours: e.target.checked })} />
-            <span>
-              <span className="block text-sm font-bold">계약 근로시간을 먼저 채우기</span>
-              <span className="mt-0.5 block text-xs text-muted">
-                직원 출근 시각을 인력이 부족한 시간대에 맞춰 날마다 다르게 정하고, 남는 시간대를 알바생 파트로 채웁니다. 연차가 있는 날은 비워 둡니다.
-              </span>
-            </span>
-          </label>
         </Section>
         {gen.error && <p className="text-sm text-danger">생성 실패: {gen.error.message}</p>}
         <div className="flex items-center justify-end gap-3">

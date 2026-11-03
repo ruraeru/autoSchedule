@@ -175,7 +175,7 @@ export default function ScheduleEditor() {
                 })
               }
               disabled={draft.status === 'CONFIRMED'}
-              title="이미 넣은 근무는 두고, 빈 날과 인원이 모자란 파트만 규칙대로 채웁니다 (실행 취소 가능)"
+              title="이미 넣은 근무는 두고, 직원 고정 근무와 알바생이 고른 파트를 채웁니다 (실행 취소 가능)"
             >
               자동 채우기
             </Button>

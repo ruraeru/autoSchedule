@@ -16,11 +16,7 @@ export interface Staff {
   title: string;
   hourlyWage: number;
   isMinor: boolean;
-  /** 직원만 사용. 주 소정근로시간 */
-  contractWeeklyHours: number | null;
-  /** 알바생만 사용. 희망 주간 근무시간 [최소, 최대] */
-  preferredWeeklyHours: [number, number] | null;
-  /** 알바생만 사용. 요일(0=월)별 근무 가능한 파트 id. 직원은 영업시간 안이면 언제나 가능 */
+  /** 알바생만 사용. 요일(0=월)별 고정 근무 파트 id. 고른 파트에는 반드시 배치한다 */
   availableParts: string[][];
   /** 직원만 사용. 고정 근무 시간(출근–퇴근). 없으면 날마다 자유롭게 정한다 */
   /** 직원 고정 근무. 요일별(0=월) 출퇴근 시각, null이면 쉬는 날. 전체가 null이면 시간 자유 */
@@ -37,21 +33,17 @@ export interface Part {
   start: string;
   end: string;
   breakMinutes: number;
-}
-
-/** 시간대별 필요 인원. 커버리지 계산 기준 */
-export interface DemandBlock {
-  start: string;
-  end: string;
+  /** 이 파트 시간대에 필요한 인원. 겹치는 파트는 더한다 */
   required: number;
-  /** 지정 요일(0=월)에만 적용. 없으면 매일. 겹치면 큰 값 */
-  days?: number[];
 }
 
 export interface Store {
   id: number;
   name: string;
   branch: string;
+  /** 사업장 규모 설정. AUTO면 구성원 수로 size를 정한다 */
+  sizeMode: 'AUTO' | 'UNDER_5' | 'OVER_5';
+  /** 실제 적용 규모. 저장할 때 sizeMode·구성원 수로 다시 정해진다 */
   size: 'UNDER_5' | 'OVER_5';
   /** 평일 영업시간 */
   open: string;
@@ -60,7 +52,6 @@ export interface Store {
   weekendOpen: string;
   weekendClose: string;
   parts: Part[];
-  demand: DemandBlock[];
   minimumWage: number;
 }
 
@@ -105,8 +96,6 @@ export interface GenerateRequest {
   periodStart: string;
   weeklyHolidayPay: WeeklyHolidayPolicy;
   priority: Priority;
-  /** 직원 계약 근로시간을 우선 채운다 */
-  fillContractHours: boolean;
 }
 
 export interface Template {

@@ -1,8 +1,8 @@
 // 백엔드 없이 동작하는 브라우저 DB. localStorage에 보관해 새로고침해도 유지한다.
-import { fixedShifts } from '../lib/rules';
+import { fixedShifts, sizeOf, sortParts } from '../lib/rules';
 import { toShifts, type AiInput, type AiOutput } from '../lib/ai';
 import { datesBetween, dayIndex, monthEnd, weeksOf } from '../lib/time';
-import type { GenerateRequest, Schedule, Shift, Staff, Store, Template } from '../types';
+import type { GenerateRequest, Schedule, Shift, Staff, Store, Template, Part } from '../types';
 import { defaultStore } from './defaults';
 
 // v6: 근무 가능 시간 → 근무 가능 파트
@@ -46,7 +46,17 @@ function fillMonth(start: string, p: Pattern): Pick<Schedule, 'periodStart' | 'p
 const fresh = (): Db => structuredClone({ store: defaultStore, staff: [], schedules: [], templates: [] });
 
 /** 예전 형식으로 저장된 구성원(근무 가능 파트 없음)은 알바생이면 전체 파트 가능으로 채운다 */
-function upgrade(d: Db): Db {
+export function upgrade(d: Db): Db {
+  // 예전 시간대별 필요 인원(demand) → 파트별 필요 인원
+  d.store.parts = d.store.parts.map((p) => ({ ...p, required: p.required ?? 1 }));
+  delete (d.store as Partial<{ demand: unknown }>).demand;
+  // 평일·주말 분리를 잠깐 썼던 데이터: 같은 시각의 주말 복사본(id_WE)을 원래 파트로 합친다
+  const twin = (id: string | null) => (id?.endsWith('_WE') && d.store.parts.some((p) => p.id === id.slice(0, -3)) ? id.slice(0, -3) : id);
+  d.store.parts = d.store.parts.filter((p) => twin(p.id) === p.id).map(({ days: _d, ...p }: Part & { days?: unknown }) => p);
+  d.staff = d.staff.map((s) => (Array.isArray(s.availableParts) ? { ...s, availableParts: s.availableParts.map((row) => [...new Set(row.map((id) => twin(id)!))]) } : s));
+  d.schedules.forEach((sc) => (sc.shifts = sc.shifts.map((s) => ({ ...s, partId: twin(s.partId) }))));
+  d.templates.forEach((t) => (t.shifts = t.shifts.map((s) => ({ ...s, partId: twin(s.partId) }))));
+  d.store.parts = sortParts(d.store.parts);
   const all = d.store.parts.map((p) => p.id);
   d.staff = d.staff.map((s) => (Array.isArray(s.availableParts) ? s : { ...s, availableParts: Array.from({ length: 7 }, () => (s.employmentType === 'PART_TIME' ? [...all] : [])) }));
   // 예전 고정 근무 {start, end, days?} → 요일별 배열
@@ -55,6 +65,9 @@ function upgrade(d: Db): Db {
     if (!w || Array.isArray(w)) return s;
     return { ...s, workHours: Array.from({ length: 7 }, (_, i) => (!w.days || w.days.includes(i) ? { start: w.start, end: w.end } : null)) };
   });
+  // 예전 데이터는 규모를 고를 수 없었으므로 자동 판정으로 시작한다
+  d.store.sizeMode ??= 'AUTO';
+  d.store.size = sizeOf(d.store.sizeMode, d.staff.length);
   return d;
 }
 
@@ -89,20 +102,22 @@ export const mock = {
     db.schedules.forEach((sc) => (sc.shifts = sc.shifts.map(clean)));
     db.templates.forEach((t) => (t.shifts = t.shifts.map(clean)));
     db.staff = db.staff.map((s) => ({ ...s, availableParts: s.availableParts.map((day) => day.filter((id) => ids.has(id))) }));
-    db.store = store;
+    db.store = { ...store, parts: sortParts(store.parts), size: sizeOf(store.sizeMode, db.staff.length) };
     persist();
-    return delay(store);
+    return delay(db.store);
   },
 
   listStaff: () => delay(db.staff),
   saveStaff(staff: Staff) {
     if (staff.id) db.staff = db.staff.map((s) => (s.id === staff.id ? staff : s));
     else db.staff.push({ ...staff, id: Math.max(0, ...db.staff.map((s) => s.id)) + 1 });
+    db.store.size = sizeOf(db.store.sizeMode, db.staff.length);
     persist();
     return delay(staff);
   },
   deleteStaff(id: number) {
     db.staff = db.staff.filter((s) => s.id !== id);
+    db.store.size = sizeOf(db.store.sizeMode, db.staff.length);
     db.schedules.forEach((sc) => {
       sc.shifts = sc.shifts.filter((s) => s.staffId !== id);
       sc.leaves = sc.leaves.filter((l) => l.staffId !== id);
@@ -152,14 +167,17 @@ export const mock = {
     return delay(schedule);
   },
 
-  /** Gemini(vite 서버의 /ai/generate)로 만들고, 응답은 규칙에 맞는 근무만 남긴다 */
+  /** 로컬 AI(vite 서버의 /ai/generate → Ollama)로 만들고, 응답은 규칙에 맞는 근무만 남긴다 */
   async generateSchedule(req: GenerateRequest) {
     if (!db.staff.length) throw new Error('직원·알바생을 먼저 등록하세요');
     const input: AiInput = { store: db.store, staff: db.staff, req };
     const res = await fetch('/ai/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const out = (await res.json().catch(() => ({}))) as AiOutput & { error?: string };
     if (!res.ok) throw new Error(out.error ?? `${res.status} ${res.statusText}`);
-    const shifts = toShifts(out, input, uid);
+    const partTimers = db.staff.filter((s) => s.employmentType === 'PART_TIME');
+    const dates = datesBetween(req.periodStart, monthEnd(req.periodStart));
+    // 알바생은 고정 근무 파트대로, 직원은 AI 응답으로
+    const shifts = [...fixedShifts(db.store, partTimers, dates, uid), ...toShifts(out, input, uid)];
     if (!shifts.length) throw new Error('AI가 조건에 맞는 근무를 만들지 못했습니다');
     const schedule: Schedule = {
       id: Math.max(0, ...db.schedules.map((s) => s.id)) + 1,

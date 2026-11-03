@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { SEED_WEEK, seedStaff, seedStore, seedWeek as seedSchedule } from './fixtures';
-import type { Shift } from '../../types';
-import { canWork, fixedShifts, gaps, hoursOn, minBreakFor, requiredBreak, validate, withTimes } from '../rules';
+import type { Part, Shift } from '../../types';
+import { upgrade } from '../../api/mock';
+import { canWork, fixedShifts, gaps, hoursOn, minBreakFor, partBreakFor, requiredAt, requiredBreak, sizeOf, sortParts, validate, withTimes } from '../rules';
 import { storeError } from '../../pages/Settings';
-import { datesBetween, monthEnd, toMin, weekDates, weeksOf } from '../time';
+import { datesBetween, dayIndex, monthEnd, weekDates, weeksOf } from '../time';
 import { autoFill } from '../autofill';
 
 const dates = weekDates(seedSchedule.periodStart);
@@ -26,6 +27,12 @@ describe('휴게시간 (R-04)', () => {
     expect(next.breakMinutes).toBe(60);
     expect(next.breakStart).toBe('13:00');
   });
+  it('사업장 규모: 자동은 구성원 5명부터 5인 이상, 수동은 그대로', () => {
+    expect([sizeOf('AUTO', 4), sizeOf('AUTO', 5), sizeOf('UNDER_5', 9), sizeOf('OVER_5', 0)]).toEqual(['UNDER_5', 'OVER_5', 'UNDER_5', 'OVER_5']);
+  });
+  it('파트 휴게 기본값은 4시간당 30분', () => {
+    expect([180, 240, 300, 480, 600].map(partBreakFor)).toEqual([0, 30, 30, 60, 60]);
+  });
 });
 
 describe('예시 근무표 검증', () => {
@@ -47,11 +54,10 @@ describe('예시 근무표 검증', () => {
     expect(v.weeks.get(dates[0])!.get(2)).toMatchObject({ workMin: 24 * 60, tentativeMin: 8 * 60, leaveMin: 8 * 60 });
   });
 
-  it('커버리지 부족: 오픈 혼자인 목·일 휴게 구간과 금 19:30–20:00', () => {
+  it('커버리지 부족: 오픈 혼자인 목·일 휴게 구간', () => {
     const all = dates.flatMap((d) => gaps(v.coverageByDate[d]).map((g) => ({ d, ...g })));
     expect(all).toEqual([
       { d: '2026-11-05', start: 10 * 60, end: 10 * 60 + 30, shortage: 1 },
-      { d: FRI, start: 19 * 60 + 30, end: 20 * 60, shortage: 1 },
       { d: '2026-11-08', start: 10 * 60, end: 10 * 60 + 30, shortage: 1 },
     ]);
   });
@@ -91,7 +97,7 @@ describe('매장 설정 검증', () => {
     expect(storeError({ ...seedStore, open: '22:00', close: '08:00' })).toMatch('평일 영업 종료');
     expect(storeError({ ...seedStore, weekendOpen: '23:00' })).toMatch('주말·공휴일');
     const late = { ...seedStore.parts[2], end: '23:00' };
-    expect(storeError({ ...seedStore, parts: [late] })).toMatch('영업시간 안');
+    expect(storeError({ ...seedStore, parts: [late] })).toBeNull();
     expect(storeError({ ...seedStore, parts: [{ ...late, name: ' ' }] })).toMatch('이름');
   });
 });
@@ -120,12 +126,18 @@ describe('근무 가능 파트 (R-01)', () => {
 });
 
 describe('fixedShifts', () => {
-  it('직원 고정 근무를 요일별로 깔고 쉬는 날·알바생은 뺀다', () => {
+  it('필요 인원은 그 시각을 덮는 파트들의 합', () => {
+    const extra = { ...seedStore.parts[1], id: 'PEAK', start: '12:00', end: '14:00', required: 2 };
+    const store = { ...seedStore, parts: [...seedStore.parts, extra] };
+    expect([requiredAt(store, 11 * 60), requiredAt(store, 13 * 60), requiredAt(store, 15 * 60)]).toEqual([1, 3, 1]);
+  });
+
+  it('직원 고정 근무를 요일별로 깔고 쉬는 날은 뺀다', () => {
     // 월 10–19, 수 13–22, 나머지 쉼
     const workHours = [{ start: '10:00', end: '19:00' }, null, { start: '13:00', end: '22:00' }, null, null, null, null];
     const staff = seedStaff.map((s) => (s.id === 1 ? { ...s, workHours } : s));
     let n = 0;
-    const out = fixedShifts(seedStore, staff, weekDates(SEED_WEEK), () => `t${++n}`);
+    const out = fixedShifts(seedStore, staff, weekDates(SEED_WEEK), () => `t${++n}`).filter((s) => s.staffId === 1);
     expect(out.map((s) => [s.staffId, s.date, s.start, s.end])).toEqual([
       [1, '2026-11-02', '10:00', '19:00'],
       [1, '2026-11-04', '13:00', '22:00'],
@@ -140,13 +152,12 @@ describe('autoFill', () => {
   const out = autoFill(seedStore, seedStaff, dates, [], [], () => `a${++n}`);
   const byStaff = (id: number) => out.filter((s) => s.staffId === id);
 
-  it('알바생을 근무 가능 파트에만, 하루 한 번만 넣는다', () => {
-    expect(out.some((s) => s.partId)).toBe(true);
-    for (const s of out.filter((x) => x.partId)) {
-      const st = seedStaff.find((x) => x.id === s.staffId)!;
-      expect(canWork(st, seedStore, s)).toBe(true);
-    }
-    expect(new Set(out.map((s) => `${s.staffId}|${s.date}`)).size).toBe(out.length);
+  it('알바생은 그 요일에 고른 파트마다 빠짐없이 넣는다', () => {
+    for (const st of seedStaff.filter((s) => s.employmentType === 'PART_TIME'))
+      for (const date of dates) {
+        const want = seedStore.parts.filter((p) => st.availableParts[dayIndex(date)].includes(p.id)).map((p) => [p.id, p.start, p.end]);
+        expect(byStaff(st.id).filter((s) => s.date === date).map((s) => [s.partId, s.start, s.end])).toEqual(want);
+      }
   });
 
   it('있는 근무는 그대로 두고, 연차인 날은 넣지 않는다', () => {
@@ -157,10 +168,26 @@ describe('autoFill', () => {
     expect(res.some((s) => s.staffId === 3 && s.date === dates[1])).toBe(false);
   });
 
-  it('희망 주간 상한을 넘기지 않는다', () => {
-    for (const st of seedStaff.filter((s) => s.employmentType === 'PART_TIME')) {
-      const min = byStaff(st.id).reduce((a, s) => a + toMin(s.end) - toMin(s.start) - s.breakMinutes, 0);
-      expect(min).toBeLessThanOrEqual(st.preferredWeeklyHours![1] * 60);
-    }
+  it('같은 파트 근무가 이미 있으면 또 넣지 않는다', () => {
+    const again = autoFill(seedStore, seedStaff, dates, out, [], () => `c${++n}`);
+    expect(again).toHaveLength(out.length);
+  });
+});
+
+describe('파트 정렬', () => {
+  it('시작 시각 순, 같으면 끝나는 시각 순', () => {
+    const mk = (id: string, start: string, end: string) => ({ ...seedStore.parts[0], id, start, end });
+    expect(sortParts([mk('a', '15:00', '19:00'), mk('b', '12:00', '17:00'), mk('c', '08:00', '14:00'), mk('d', '08:00', '12:00')]).map((p) => p.id)).toEqual(['d', 'c', 'b', 'a']);
+  });
+
+  it('예전 주말 복사본(id_WE)은 원래 파트로 합친다', () => {
+    const x = { ...seedStore.parts[0], id: 'X', days: 'WEEKDAY' } as Part;
+    const st = { ...seedStaff[2], availableParts: Array.from({ length: 7 }, (_, i) => (i >= 5 ? ['X_WE'] : ['X'])) };
+    const shift = (date: string, partId: string): Shift => ({ id: date, staffId: st.id, date, start: '08:00', end: '12:00', partId, breakStart: null, breakMinutes: 0, tentative: false });
+    const sc = { ...seedSchedule, shifts: [shift('2026-11-06', 'X'), shift('2026-11-07', 'X_WE')] };
+    const d = upgrade({ store: { ...seedStore, parts: [x, { ...x, id: 'X_WE', days: 'WEEKEND' } as Part] }, staff: [st], schedules: [sc], templates: [] });
+    expect(d.store.parts).toEqual([{ ...seedStore.parts[0], id: 'X' }]);
+    expect(d.staff[0].availableParts.flat()).toEqual(Array(7).fill('X'));
+    expect(d.schedules[0].shifts.map((s) => s.partId)).toEqual(['X', 'X']);
   });
 });
