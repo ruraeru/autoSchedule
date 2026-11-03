@@ -25,15 +25,15 @@ export default function PartView({ schedule, staff, store, dates, onOpen }: Prop
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over) return;
     const [partId, date] = String(over.id).split('|');
+    const part = store.parts.find((p) => p.id === partId);
     edit((s) => {
       const i = s.shifts.findIndex((x) => x.id === active.id);
       const sh = { ...s.shifts[i], date };
-      const part = store.parts.find((p) => p.id === partId);
       const isFull = staff.find((x) => x.id === sh.staffId)?.employmentType === 'FULL_TIME';
       // 직원은 파트에 묶지 않는다: 날짜만 옮긴다
       s.shifts[i] =
         part && !isFull
-          ? withTimes({ ...sh, partId: part.id, breakStart: null }, part.start, part.end)
+          ? withTimes({ ...sh, partId: part.id, breakStart: null }, part.start, part.end, part.breakMinutes)
           : placeBreak({ ...sh, partId: partId === FREE || isFull ? null : sh.partId });
     });
   };

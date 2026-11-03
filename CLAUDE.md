@@ -14,25 +14,29 @@
 ## 데이터
 - mock DB: `src/api/mock.ts`, localStorage 키 `autoschedule-mock-v6`. 로드 시 `upgrade()`가 예전 형식을 고친다:
   - `availableParts`가 없는 데이터를 채운다.
+  - 예전 시간대별 필요 인원(`demand`)을 지우고 파트별 `required`(기본 1)를 채운다.
+  - 잠깐 썼던 평일·주말 분리의 주말 복사본(`id_WE`)은 원래 파트로 합치고 `days`를 지운다.
   - `workHours {start,end,days}` 형식을 요일별 배열로 바꾼다.
 - 예시 데이터는 앱에 없다. 테스트 전용 `src/lib/__tests__/fixtures.ts`(카페 커푸치노 성수점, 2026-11-02 주).
 - 매장 기본값: `src/api/defaults.ts`.
 - 구성원:
-  - 알바생: `availableParts[요일][]`(0=월)로 근무 가능 파트를 정한다.
+  - 근무 파트: 평일·주말 구분이 없다. 저장할 때 시작 시각 순으로 정렬한다(`sortParts`).
+  - 알바생: `availableParts[요일][]`(0=월)는 고정 근무 파트다. 고른 칸에는 반드시 배치한다.
   - 직원: `workHours`는 요일별 `{start,end}|null` 배열(고정 근무)이다.
 - 근무표는 달력 기준 한 달(1일~말일)이다. 화면은 주(월~일) 탭으로 나눈다(`weeksOf`).
 
 ## 근무표 생성
-- **AI 생성:** `POST /ai/generate`는 vite dev/preview 서버 미들웨어(`vite.config.ts`)가 Gemini REST를 호출한다.
-  - 키는 `web/.env.local`의 `GEMINI_API_KEY`에서 읽는다. 이 파일은 gitignore 대상이다. **키를 코드·번들·커밋에 절대 넣지 않는다.**
-  - 모델은 앞 모델이 붐비면 다음 모델로 넘어간다: `gemini-3.5-flash,gemini-2.5-flash,gemini-3.5-flash-lite`. `GEMINI_MODEL`로 바꿀 수 있다.
-  - 재시도 대상은 429/500/503/504이고, 시도당 제한 시간은 150초다.
+- **AI 생성:** `POST /ai/generate`는 vite dev/preview 서버 미들웨어(`vite.config.ts`)가 로컬 Ollama `/api/chat`을 호출한다.
+  - 주소·모델: `LLM_BASE_URL`(기본 `http://100.70.239.59:11434`, Proxmox VM), `LLM_MODEL`(기본 `qwen3.5:9b`). `web/.env.local`에서 바꾼다.
+  - `format`에 JSON Schema(`RESPONSE_SCHEMA`)를 넘겨 JSON으로만 답하게 한다. `think: false`, `stream: true`(node fetch 300초 헤더 제한 회피), `num_ctx: 16384`, 제한 시간 600초. 응답에 `partId`는 받지 않는다(AI는 직원만 정함).
+  - VM의 Ollama는 `OLLAMA_HOST=0.0.0.0`으로 띄워야 이 머신에서 닿는다.
 - **프롬프트·검증:** `src/lib/ai.ts`.
   - `buildPrompt`는 구성원 이름·연락처를 빼고 `#id`로만 보낸다.
   - `toShifts`는 AI 응답을 믿지 않고 규칙에 맞지 않는 줄을 버린다.
 - **규칙 기반 생성:**
-  - `autoFill`(`src/lib/autofill.ts`): 에디터의 "자동 채우기". 기존 근무는 유지하고, 빈 날에 고정 근무를, 부족한 파트에 알바생을 넣는다.
-  - `fixedShifts`(`src/lib/rules.ts`): 직접 만들기에서 직원 고정 근무를 미리 넣을 때 쓴다.
+  - `fixedShifts`(`src/lib/rules.ts`): 고정 근무(직원 요일별 시각, 알바생 고른 파트)를 깐다. 직접 만들기 미리 채우기, 자동 채우기, AI 생성(알바생 몫)이 모두 쓴다.
+  - `autoFill`(`src/lib/autofill.ts`): 에디터의 "자동 채우기". 기존 근무는 유지하고 고정 근무만 더한다. 필요 인원으로 사람을 더 넣지 않는다.
+  - AI는 직원 근무만 정한다. 필요 인원은 파트별 `required`이고, 겹치는 파트는 더한다(`requiredAt`).
 - 규칙 엔진: `src/lib/rules.ts`(`validate`, `canWork`, `hoursOn`, 휴게 계산). 근무표 평가 UI(부족/충족, 규칙 위반 표시)는 의도적으로 뺐다.
 
 ## 화면 (라우트 → 파일)
@@ -65,7 +69,7 @@
 
 ## 알려진 단순화 (`shortcut:` 주석)
 - 공휴일은 2026년만 하드코딩돼 있다(`lib/time.ts`).
-- Gemini 호출은 vite 서버에서만 된다. 배포하려면 백엔드로 옮겨야 한다(`vite.config.ts`).
+- 로컬 AI 호출은 vite 서버에서만 된다. 배포하려면 백엔드로 옮겨야 한다(`vite.config.ts`).
 - 생성 진행률은 실제 진행이 아니라 시간 기반 추정이다(`Generate.tsx`).
 - mock 계정은 브라우저에만 있고, 계정마다 데이터가 나뉘지 않는다(`api/auth.ts`).
 - `web/README.md`는 예전 내용이 남아 있어 최신이 아니다.

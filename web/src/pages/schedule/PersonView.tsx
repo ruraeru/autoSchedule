@@ -90,7 +90,7 @@ function summary(p: Staff, w: StaffWeek) {
   if (p.employmentType === 'FULL_TIME') {
     if (w.tentativeMin || w.leaveMin)
       return [`확정 ${hours(w.workMin)}`, w.tentativeMin && `미정 ${hours(w.tentativeMin)}`, w.leaveMin && `연차 ${hours(w.leaveMin)}`].filter(Boolean).join(' · ');
-    return `${hours(w.workMin)} / ${p.contractWeeklyHours}h · 연장 ${hours(w.overtimeMin)}`;
+    return `${hours(w.workMin)} · 연장 ${hours(w.overtimeMin)}`;
   }
   return (
     <>

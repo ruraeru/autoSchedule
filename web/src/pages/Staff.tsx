@@ -5,6 +5,7 @@ import { keys, useStaff, useStore } from '../api/queries';
 import Icon from '../components/Icon';
 import PageHeader from '../components/PageHeader';
 import { Avatar, Badge, Button, Card, cx, Field, inputBase, inputClass, Loading, Segmented } from '../components/ui';
+import { sortParts } from '../lib/rules';
 import { DAY_LABELS } from '../lib/time';
 import type { EmploymentType, Part, Staff, WorkTime } from '../types';
 
@@ -23,8 +24,6 @@ const blank = (type: EmploymentType): Staff => ({
   title: type === 'FULL_TIME' ? '정직원' : '알바',
   hourlyWage: 10320,
   isMinor: false,
-  contractWeeklyHours: type === 'FULL_TIME' ? 40 : null,
-  preferredWeeklyHours: type === 'PART_TIME' ? [8, 15] : null,
   availableParts: Array.from({ length: 7 }, () => []),
   workHours: type === 'FULL_TIME' ? defaultHours() : null,
   phone: '',
@@ -44,7 +43,7 @@ export default function StaffPage() {
     <div>
       <PageHeader
         title="직원·알바생 관리"
-        sub="직원은 계약 주 근로시간 안에서 출근 시간을 유동 배치하고, 알바생은 파트 단위로 배치합니다."
+        sub="직원은 요일별 고정 근무 시각으로, 알바생은 파트 단위로 배치합니다."
         actions={
           <Button variant="primary" onClick={() => setEditing(blank(filter === 'FULL_TIME' ? 'FULL_TIME' : 'PART_TIME'))}>
             <Icon name="plus" />
@@ -72,7 +71,6 @@ export default function StaffPage() {
                 <th className="px-4 py-3 font-normal">이름</th>
                 <th className="px-4 py-3 font-normal">고용 형태</th>
                 <th className="px-4 py-3 text-right font-normal">시급</th>
-                <th className="px-4 py-3 text-right font-normal">주 근로시간</th>
                 <th className="px-4 py-3 font-normal">연락처</th>
               </tr>
             </thead>
@@ -90,17 +88,13 @@ export default function StaffPage() {
                     {s.employmentType === 'FULL_TIME' ? <Badge tone="staff">직원 · {s.title}</Badge> : <span className="text-muted">알바 · 파트 근무</span>}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">{s.hourlyWage.toLocaleString()}원</td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    <span className="text-xs text-muted">{s.employmentType === 'FULL_TIME' ? '계약 ' : '희망 '}</span>
-                    {s.employmentType === 'FULL_TIME' ? `${s.contractWeeklyHours}h` : `${s.preferredWeeklyHours?.join('–')}h`}
-                  </td>
                   <td className="px-4 py-3 text-muted">{s.phone}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </Card>
-        {editing && <StaffForm key={editing.id || 'new'} initial={editing} parts={store.parts} minWage={store.minimumWage} onClose={() => setEditing(null)} />}
+        {editing && <StaffForm key={editing.id || 'new'} initial={editing} parts={sortParts(store.parts)} minWage={store.minimumWage} onClose={() => setEditing(null)} />}
       </div>
     </div>
   );
@@ -113,6 +107,8 @@ function StaffForm({ initial, parts, minWage, onClose }: { initial: Staff; parts
   const done = () => {
     qc.invalidateQueries({ queryKey: keys.staff });
     qc.invalidateQueries({ queryKey: keys.schedules });
+    // 구성원 수가 바뀌면 자동 판정 규모도 바뀐다
+    qc.invalidateQueries({ queryKey: keys.store });
     onClose();
   };
   const save = useMutation({ mutationFn: () => api.saveStaff(s), onSuccess: done });
@@ -129,19 +125,18 @@ function StaffForm({ initial, parts, minWage, onClose }: { initial: Staff; parts
     set({
       employmentType: t,
       title: t === 'FULL_TIME' ? '정직원' : s.isMinor ? '연소자' : '알바',
-      contractWeeklyHours: t === 'FULL_TIME' ? (s.contractWeeklyHours ?? 40) : null,
       workHours: t === 'FULL_TIME' ? (s.workHours ?? defaultHours()) : null,
-      preferredWeeklyHours: t === 'PART_TIME' ? (s.preferredWeeklyHours ?? [8, 15]) : null,
       isMinor: t === 'FULL_TIME' ? false : s.isMinor,
     });
-  // 순서는 매장 설정의 파트 순서를 따른다
+  // 순서는 시작 시각 순
+  const ids = parts.map((p) => p.id);
   const toggle = (d: number, id: string) =>
-    set({ availableParts: s.availableParts.map((row, i) => (i !== d ? row : parts.map((p) => p.id).filter((x) => (x === id ? !row.includes(x) : row.includes(x))))) });
-  const toggleDay = (d: number) => set({ availableParts: s.availableParts.map((row, i) => (i !== d ? row : row.length ? [] : parts.map((p) => p.id))) });
+    set({ availableParts: s.availableParts.map((row, i) => (i !== d ? row : ids.filter((x) => (x === id ? !row.includes(x) : row.includes(x))))) });
+  const toggleDay = (d: number) => set({ availableParts: s.availableParts.map((row, i) => (i !== d ? row : row.length ? [] : ids)) });
   // 모든 요일에 켜져 있으면 다 끄고, 아니면 다 켠다
   const togglePart = (id: string) => {
     const on = !s.availableParts.every((row) => row.includes(id));
-    set({ availableParts: s.availableParts.map((row) => parts.map((p) => p.id).filter((x) => (x === id ? on : row.includes(x)))) });
+    set({ availableParts: s.availableParts.map((row) => ids.filter((x) => (x === id ? on : row.includes(x)))) });
   };
 
   return (
@@ -174,35 +169,12 @@ function StaffForm({ initial, parts, minWage, onClose }: { initial: Staff; parts
         <Field label={full ? '통상시급' : '시급'} hint={s.hourlyWage < minWage ? `최저임금 ${minWage.toLocaleString()}원 미만` : undefined}>
           <input type="number" className={inputClass} value={s.hourlyWage} step={10} onChange={(e) => set({ hourlyWage: Number(e.target.value) })} />
         </Field>
-        {full ? (
-          <Field label="계약 주 근로시간" hint="연장근로는 주 12시간까지">
-            <input type="number" className={inputClass} value={s.contractWeeklyHours ?? 40} min={1} max={52} onChange={(e) => set({ contractWeeklyHours: Number(e.target.value) })} />
-          </Field>
-        ) : (
-          <Field label="희망 주간 근무시간">
-            <div className="flex items-center gap-1.5">
-              {[0, 1].map((i) => (
-                <input
-                  key={i}
-                  type="number"
-                  className={inputClass}
-                  value={s.preferredWeeklyHours?.[i] ?? 0}
-                  onChange={(e) => {
-                    const p: [number, number] = [...(s.preferredWeeklyHours ?? [0, 0])] as [number, number];
-                    p[i] = Number(e.target.value);
-                    set({ preferredWeeklyHours: p });
-                  }}
-                />
-              ))}
-            </div>
+        {full && (
+          <Field label="연락처">
+            <input className={inputClass} value={s.phone} onChange={(e) => set({ phone: e.target.value })} />
           </Field>
         )}
       </div>
-      {full && (
-        <Field label="연락처">
-          <input className={inputClass} value={s.phone} onChange={(e) => set({ phone: e.target.value })} />
-        </Field>
-      )}
       {!full && (
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" className="size-4 accent-brand" checked={s.isMinor} onChange={(e) => set({ isMinor: e.target.checked, title: e.target.checked ? '연소자' : '알바' })} />

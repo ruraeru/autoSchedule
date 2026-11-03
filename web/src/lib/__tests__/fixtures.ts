@@ -6,29 +6,22 @@ import type { Leave, Part, Schedule, Shift, Staff, Store } from '../../types';
 export const SEED_WEEK = '2026-11-02';
 
 const parts: Part[] = [
-  { id: 'OPEN', name: '오픈', tone: 'open', start: '08:00', end: '12:00', breakMinutes: minBreakFor(240) },
-  { id: 'MIDDLE', name: '미들', tone: 'middle', start: '12:00', end: '17:00', breakMinutes: minBreakFor(300) },
-  { id: 'CLOSE', name: '마감', tone: 'close', start: '17:00', end: '22:00', breakMinutes: minBreakFor(300) },
+  { id: 'OPEN', name: '오픈', tone: 'open', start: '08:00', end: '12:00', breakMinutes: minBreakFor(240), required: 1 },
+  { id: 'MIDDLE', name: '미들', tone: 'middle', start: '12:00', end: '17:00', breakMinutes: minBreakFor(300), required: 1 },
+  { id: 'CLOSE', name: '마감', tone: 'close', start: '17:00', end: '22:00', breakMinutes: minBreakFor(300), required: 1 },
 ];
 
 export const seedStore: Store = {
   id: 1,
   name: '카페 커푸치노',
   branch: '성수점',
+  sizeMode: 'OVER_5',
   size: 'OVER_5',
   open: '08:00',
   close: '22:00',
   weekendOpen: '08:00',
   weekendClose: '22:00',
   parts,
-  demand: [
-    { start: '08:00', end: '12:00', required: 1 },
-    { start: '12:00', end: '14:00', required: 2 },
-    { start: '14:00', end: '17:00', required: 1 },
-    { start: '17:00', end: '20:00', required: 2 },
-    { start: '20:00', end: '22:00', required: 1 },
-    { start: '18:00', end: '20:00', required: 3, days: [4, 5] },
-  ],
   minimumWage: 10320,
 };
 
@@ -40,8 +33,6 @@ const person = (p: Partial<Staff> & Pick<Staff, 'id' | 'name'>): Staff => ({
   title: '알바',
   hourlyWage: 10320,
   isMinor: false,
-  contractWeeklyHours: null,
-  preferredWeeklyHours: [8, 15],
   availableParts: everyDay(),
   phone: '010-0000-0000',
   ...p,
@@ -51,16 +42,16 @@ const parkAvailability = everyDay();
 parkAvailability[5] = ['OPEN', 'MIDDLE']; // 박하은: 토요일 마감 불가
 
 export const seedStaff: Staff[] = [
-  person({ id: 1, name: '오지훈', employmentType: 'FULL_TIME', title: '매니저', hourlyWage: 13000, contractWeeklyHours: 40, preferredWeeklyHours: null, availableParts: everyDay([]), phone: '010-2481-3301' }),
-  person({ id: 2, name: '서하린', employmentType: 'FULL_TIME', title: '정직원', hourlyWage: 11500, contractWeeklyHours: 40, preferredWeeklyHours: null, availableParts: everyDay([]), phone: '010-5512-0920' }),
-  person({ id: 3, name: '김민지', preferredWeeklyHours: [8, 15], phone: '010-3392-1187' }),
-  person({ id: 4, name: '이서준', preferredWeeklyHours: [12, 16], phone: '010-7720-4410' }),
-  person({ id: 5, name: '박하은', preferredWeeklyHours: [10, 18], availableParts: parkAvailability, phone: '010-9031-5527' }),
-  person({ id: 6, name: '최도윤', preferredWeeklyHours: [15, 20], phone: '010-4418-6603' }),
-  person({ id: 7, name: '정유나', preferredWeeklyHours: [10, 16], phone: '010-2205-7719' }),
-  person({ id: 8, name: '강지호', preferredWeeklyHours: [10, 20], phone: '010-6630-2284' }),
-  person({ id: 9, name: '윤서연', preferredWeeklyHours: [10, 16], phone: '010-8814-3356' }),
-  person({ id: 10, name: '한태민', title: '연소자', isMinor: true, preferredWeeklyHours: [6, 12], availableParts: everyDay(['OPEN', 'MIDDLE']), phone: '010-1197-4402' }),
+  person({ id: 1, name: '오지훈', employmentType: 'FULL_TIME', title: '매니저', hourlyWage: 13000, availableParts: everyDay([]), phone: '010-2481-3301' }),
+  person({ id: 2, name: '서하린', employmentType: 'FULL_TIME', title: '정직원', hourlyWage: 11500, availableParts: everyDay([]), phone: '010-5512-0920' }),
+  person({ id: 3, name: '김민지', phone: '010-3392-1187' }),
+  person({ id: 4, name: '이서준', phone: '010-7720-4410' }),
+  person({ id: 5, name: '박하은', availableParts: parkAvailability, phone: '010-9031-5527' }),
+  person({ id: 6, name: '최도윤', phone: '010-4418-6603' }),
+  person({ id: 7, name: '정유나', phone: '010-2205-7719' }),
+  person({ id: 8, name: '강지호', phone: '010-6630-2284' }),
+  person({ id: 9, name: '윤서연', phone: '010-8814-3356' }),
+  person({ id: 10, name: '한태민', title: '연소자', isMinor: true, availableParts: everyDay(['OPEN', 'MIDDLE']), phone: '010-1197-4402' }),
 ];
 
 let n = 0;
