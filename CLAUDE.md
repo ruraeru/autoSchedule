@@ -28,10 +28,11 @@
 - 근무표는 달력 기준 한 달(1일~말일)이다. 화면은 주(월~일) 탭으로 나눈다(`weeksOf`).
 
 ## 근무표 생성
-- **AI 생성:** `POST /ai/generate`는 vite dev/preview 서버 미들웨어(`vite.config.ts`)가 로컬 Ollama `/api/chat`을 호출한다.
-  - 주소·모델: `LLM_BASE_URL`(기본 `http://100.70.239.59:11434`, Proxmox VM), `LLM_MODEL`(기본 `qwen3.5:9b`). `web/.env.local`에서 바꾼다.
-  - `format`에 JSON Schema(`RESPONSE_SCHEMA`)를 넘겨 JSON으로만 답하게 한다. `think: false`, `stream: true`(node fetch 300초 헤더 제한 회피), `num_ctx: 16384`, 제한 시간 600초. 응답에 `partId`는 받지 않는다(AI는 직원만 정함).
-  - VM의 Ollama는 `OLLAMA_HOST=0.0.0.0`으로 띄워야 이 머신에서 닿는다.
+- **AI 생성:** `POST /ai/generate`는 vite dev/preview 서버 미들웨어(`vite.config.ts`)가 LLM 어댑터 `src/lib/llm.ts`(`generateJson`)를 부른다. 어댑터는 서버 전용이라 브라우저 코드에서 import하지 않는다.
+  - 환경변수는 `web/.env.example`을 `web/.env.local`로 복사해서 정한다.
+  - `LLM_BASE_URL`(기본 `https://ai.ruraeru.xyz`, Ollama 호환)의 `/api/chat`, `LLM_MODEL`(기본 `qwen3.5:9b`). 이 서버는 Bearer 토큰이 필요하다: `LLM_API_KEY`. `think: false`, `num_ctx: 8192`. 제한 시간은 없다(`stream: true`로 node fetch 300초 헤더 제한 회피).
+  - 연결 확인: `/api/tags`(모델 목록)에 같은 Bearer 헤더로 요청한다.
+  - 응답은 JSON Schema(`RESPONSE_SCHEMA`)로 강제한다. 응답에 `partId`는 받지 않는다(AI는 직원만 정함).
 - **프롬프트·검증:** `src/lib/ai.ts`.
   - `buildPrompt`는 구성원 이름·연락처를 빼고 `#id`로만 보낸다.
   - `toShifts`는 AI 응답을 믿지 않고 규칙에 맞지 않는 줄을 버린다.
