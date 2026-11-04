@@ -29,7 +29,7 @@
 
 ## 근무표 생성
 - **AI 생성:** 브라우저가 `buildPrompt`로 프롬프트를 만들어 `POST /ai/generate`에 `{ prompt }`로 보낸다. 서버 코드는 `web/api/generate.ts`(`handleGenerate`) 하나다.
-  - 배포(Vercel, 루트 `web/`): `api/generate.ts`가 함수로 돈다. `web/vercel.json`이 `/ai/generate`를 `/api/generate`로 보내고 `maxDuration` 300초를 준다. Vercel 환경변수에 `LLM_*`를 넣어야 한다.
+  - 배포(Vercel, 루트 `web/`): `api/generate.ts`가 함수로 돈다. `web/vercel.json`이 `/ai/generate`를 `/api/generate`로 보내고 `maxDuration` 300초를 준다. 나머지 경로(`/api/` 제외)는 `index.html`로 보내 새로고침·직접 접속을 살린다. Vercel 환경변수에 `LLM_*`를 넣어야 한다.
   - 로컬: vite dev/preview 서버 미들웨어(`vite.config.ts`)가 같은 `handleGenerate`를 쓴다.
   - `api/generate.ts`는 Vercel이 따로 컴파일하므로 다른 파일을 import하지 않는다. 브라우저 코드에서도 import하지 않는다.
   - 환경변수는 `web/.env.example`을 `web/.env.local`로 복사해서 정한다.
