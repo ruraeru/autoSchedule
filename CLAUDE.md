@@ -28,7 +28,10 @@
 - 근무표는 달력 기준 한 달(1일~말일)이다. 화면은 주(월~일) 탭으로 나눈다(`weeksOf`).
 
 ## 근무표 생성
-- **AI 생성:** `POST /ai/generate`는 vite dev/preview 서버 미들웨어(`vite.config.ts`)가 LLM 어댑터 `src/lib/llm.ts`(`generateJson`)를 부른다. 어댑터는 서버 전용이라 브라우저 코드에서 import하지 않는다.
+- **AI 생성:** 브라우저가 `buildPrompt`로 프롬프트를 만들어 `POST /ai/generate`에 `{ prompt }`로 보낸다. 서버 코드는 `web/api/generate.ts`(`handleGenerate`) 하나다.
+  - 배포(Vercel, 루트 `web/`): `api/generate.ts`가 함수로 돈다. `web/vercel.json`이 `/ai/generate`를 `/api/generate`로 보내고 `maxDuration` 300초를 준다. Vercel 환경변수에 `LLM_*`를 넣어야 한다.
+  - 로컬: vite dev/preview 서버 미들웨어(`vite.config.ts`)가 같은 `handleGenerate`를 쓴다.
+  - `api/generate.ts`는 Vercel이 따로 컴파일하므로 다른 파일을 import하지 않는다. 브라우저 코드에서도 import하지 않는다.
   - 환경변수는 `web/.env.example`을 `web/.env.local`로 복사해서 정한다.
   - `LLM_BASE_URL`(기본 `https://ai.ruraeru.xyz`, Ollama 호환)의 `/api/chat`, `LLM_MODEL`(기본 `qwen3.5:9b`). 이 서버는 Bearer 토큰이 필요하다: `LLM_API_KEY`. `think: false`, `num_ctx: 8192`. 제한 시간은 없다(`stream: true`로 node fetch 300초 헤더 제한 회피).
   - 연결 확인: `/api/tags`(모델 목록)에 같은 Bearer 헤더로 요청한다.
@@ -72,7 +75,7 @@
 
 ## 알려진 단순화 (`shortcut:` 주석)
 - 공휴일은 2026년만 하드코딩돼 있다(`lib/time.ts`).
-- 로컬 AI 호출은 vite 서버에서만 된다. 배포하려면 백엔드로 옮겨야 한다(`vite.config.ts`).
+- `/ai/generate`에는 인증이 없다. 배포 주소를 아는 누구나 AI 서버 토큰으로 요청할 수 있다(`api/generate.ts`).
 - 상시 근로자 수를 등록 구성원 수로 본다. 법 기준은 직전 1개월 평균 인원이다(`lib/rules.ts` `sizeOf`).
 - 생성 진행률은 실제 진행이 아니라 시간 기반 추정이다(`Generate.tsx`).
 - mock 계정은 브라우저에만 있고, 계정마다 데이터가 나뉘지 않는다(`api/auth.ts`).

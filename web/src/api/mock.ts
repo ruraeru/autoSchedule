@@ -1,6 +1,6 @@
 // 백엔드 없이 동작하는 브라우저 DB. localStorage에 보관해 새로고침해도 유지한다.
 import { fixedShifts, sizeOf, sortParts } from '../lib/rules';
-import { toShifts, type AiInput, type AiOutput } from '../lib/ai';
+import { buildPrompt, toShifts, type AiInput, type AiOutput } from '../lib/ai';
 import { datesBetween, dayIndex, monthEnd, weeksOf } from '../lib/time';
 import type { GenerateRequest, Schedule, Shift, Staff, Store, Template, Part } from '../types';
 import { defaultStore } from './defaults';
@@ -167,11 +167,11 @@ export const mock = {
     return delay(schedule);
   },
 
-  /** 로컬 AI(vite 서버의 /ai/generate → Ollama)로 만들고, 응답은 규칙에 맞는 근무만 남긴다 */
+  /** AI 서버(/ai/generate → api/generate.ts)로 만들고, 응답은 규칙에 맞는 근무만 남긴다 */
   async generateSchedule(req: GenerateRequest) {
     if (!db.staff.length) throw new Error('직원·알바생을 먼저 등록하세요');
     const input: AiInput = { store: db.store, staff: db.staff, req };
-    const res = await fetch('/ai/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+    const res = await fetch('/ai/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: buildPrompt(input) }) });
     const out = (await res.json().catch(() => ({}))) as AiOutput & { error?: string };
     if (!res.ok) throw new Error(out.error ?? `${res.status} ${res.statusText}`);
     const partTimers = db.staff.filter((s) => s.employmentType === 'PART_TIME');

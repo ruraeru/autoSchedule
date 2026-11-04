@@ -1,12 +1,10 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { buildPrompt, RESPONSE_SCHEMA, type AiInput } from './src/lib/ai';
-import { generateJson, llmConfig, LlmError, type LlmConfig } from './src/lib/llm';
+import { handleGenerate } from './api/generate';
 
 /**
- * POST /ai/generate → LLM 어댑터(src/lib/llm.ts). 브라우저는 vite 서버만 부르고, AI 주소·키는 서버에만 있다.
- * shortcut: vite dev/preview 서버에서만 동작. 배포하려면 같은 일을 백엔드(Spring Boot)에서 해야 한다.
+ * POST /ai/generate → api/generate.ts. 배포(Vercel)에서는 같은 파일이 함수로 돈다. AI 주소·키는 서버에만 있다.
  */
 // @types/node 없이 쓰는 최소 타입
 interface Req {
@@ -20,7 +18,7 @@ interface Res {
   end(body: string): void;
 }
 
-function aiGenerate(cfg: LlmConfig): Plugin {
+function aiGenerate(env: Record<string, string | undefined>): Plugin {
   const handle = (req: Req, res: Res) => {
     const send = (status: number, body: unknown) => {
       res.statusCode = status;
@@ -35,13 +33,8 @@ function aiGenerate(cfg: LlmConfig): Plugin {
       if (raw.length > 1_000_000) req.destroy();
     });
     req.on('end', async () => {
-      try {
-        send(200, await generateJson(cfg, buildPrompt(JSON.parse(raw) as AiInput), RESPONSE_SCHEMA));
-      } catch (e) {
-        if (e instanceof LlmError) return send(e.status, { error: e.message });
-        console.error('[llm]', e);
-        send(502, { error: `생성 실패: ${(e as Error).message}` });
-      }
+      const { status, body } = await handleGenerate(raw, env);
+      send(status, body);
     });
   };
   return {
@@ -55,7 +48,7 @@ function aiGenerate(cfg: LlmConfig): Plugin {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', 'LLM_');
   return {
-    plugins: [react(), tailwindcss(), aiGenerate(llmConfig(env))],
+    plugins: [react(), tailwindcss(), aiGenerate(env)],
     server: {
       // 백엔드(Spring Boot) 연동 시 VITE_USE_MOCK=false 로 실행
       proxy: { '/api': 'http://localhost:8080' },

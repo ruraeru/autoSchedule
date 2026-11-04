@@ -1,0 +1,4 @@
+{
+  "rewrites": [{ "source": "/ai/generate", "destination": "/api/generate" }],
+  "functions": { "api/generate.ts": { "maxDuration": 300 } }
+}

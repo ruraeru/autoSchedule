@@ -1,4 +1,4 @@
-// AI 근무표 생성: 프롬프트 만들기(서버)와 응답 검증(브라우저)
+// AI 근무표 생성: 프롬프트 만들기와 응답 검증(둘 다 브라우저). 호출은 서버(api/generate.ts)가 한다
 import type { GenerateRequest, Shift, Staff, Store } from '../types';
 import { canWork, hoursOn, withTimes } from './rules';
 import { datesBetween, dayIndex, DAY_LABELS, fromMin, isWeekendOrHoliday, monthEnd, snap, toMin } from './time';
@@ -22,28 +22,6 @@ export interface AiOutput {
   shifts: AiShift[];
   comment: string;
 }
-
-/** Ollama format (JSON Schema) */
-export const RESPONSE_SCHEMA = {
-  type: 'object',
-  properties: {
-    shifts: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          staffId: { type: 'integer' },
-          date: { type: 'string', description: 'YYYY-MM-DD' },
-          start: { type: 'string', description: 'HH:MM, 15분 단위' },
-          end: { type: 'string', description: 'HH:MM, 15분 단위' },
-        },
-        required: ['staffId', 'date', 'start', 'end'],
-      },
-    },
-    comment: { type: 'string', description: '사장님께 드리는 2~3문장 배치 요약' },
-  },
-  required: ['shifts', 'comment'],
-};
 
 /** 이름·연락처는 빼고 번호로만 보낸다 */
 export function buildPrompt({ store, staff, req }: AiInput): string {
