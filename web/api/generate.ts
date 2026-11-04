@@ -52,7 +52,8 @@ export function llmConfig(env: Record<string, string | undefined>): LlmConfig {
   return {
     baseUrl: (env.LLM_BASE_URL || 'https://ai.ruraeru.xyz').replace(/\/+$/, ''),
     model: env.LLM_MODEL || 'qwen3.5:9b',
-    apiKey: env.LLM_API_KEY || undefined,
+    // 대시보드에 붙여넣을 때 섞이는 공백·따옴표·"Bearer "를 걷어낸다
+    apiKey: env.LLM_API_KEY?.trim().replace(/^["']|["']$/g, '').replace(/^Bearer\s+/i, '') || undefined,
   };
 }
 
@@ -78,6 +79,8 @@ export async function generateJson(cfg: LlmConfig, prompt: string, schema: objec
   if (!r.ok) {
     const data = await r.json().catch(() => null);
     console.error(`[llm] ${r.status}`, data);
+    if (r.status === 401 || r.status === 403)
+      throw new LlmError(502, `AI 서버가 인증을 거절했습니다(${r.status}). LLM_API_KEY ${cfg.apiKey ? `값을 확인하세요(길이 ${cfg.apiKey.length})` : '환경변수가 없습니다. 넣은 뒤 다시 배포하세요'}`);
     throw new LlmError(502, `AI 오류: ${data?.error ?? r.status}`);
   }
   // 한 줄에 JSON 하나(NDJSON). message.content 조각을 이어 붙인다

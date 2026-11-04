@@ -37,3 +37,15 @@ describe('handleGenerate', () => {
     expect(await handleGenerate('{"prompt":"p"}', {})).toEqual({ status: 200, body: { shifts: [] } });
   });
 });
+
+describe('llmConfig', () => {
+  it('키의 공백·따옴표·Bearer 접두사를 걷어낸다', () => {
+    expect(llmConfig({ LLM_API_KEY: ' "Bearer abc"\n' }).apiKey).toBe('abc');
+  });
+
+  it('401이면 키 유무를 알려준다', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response('{}', { status: 401 })));
+    expect((await handleGenerate('{"prompt":"p"}', {})).body).toEqual({ error: expect.stringContaining('환경변수가 없습니다') });
+    expect((await handleGenerate('{"prompt":"p"}', { LLM_API_KEY: 'abc' })).body).toEqual({ error: expect.stringContaining('길이 3') });
+  });
+});
