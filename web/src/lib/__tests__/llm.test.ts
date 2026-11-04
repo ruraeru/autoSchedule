@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { generateJson, llmConfig } from '../llm';
+import { generateJson, handleGenerate, llmConfig } from '../../../api/generate';
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 
@@ -23,5 +23,17 @@ describe('generateJson', () => {
     vi.stubGlobal('fetch', fetch);
     await generateJson(llmConfig({}), 'p', {});
     expect(fetch.mock.calls[0][1].headers.Authorization).toBeUndefined();
+  });
+});
+
+describe('handleGenerate', () => {
+  it('prompt가 없으면 400', async () => {
+    expect((await handleGenerate('{}', {})).status).toBe(400);
+    expect((await handleGenerate('not json', {})).status).toBe(400);
+  });
+
+  it('prompt를 AI에 보내고 JSON을 돌려준다', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"message":{"content":"{\\"shifts\\":[]}"},"done":true}\n')));
+    expect(await handleGenerate('{"prompt":"p"}', {})).toEqual({ status: 200, body: { shifts: [] } });
   });
 });
