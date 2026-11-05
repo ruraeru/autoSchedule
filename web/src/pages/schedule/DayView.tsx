@@ -42,12 +42,13 @@ export default function DayView({ schedule, staff, store, dates, date, onDate, o
   const [drag, setDrag] = useState<Drag | null>(null);
   const [preview, setPreview] = useState<Shift | null>(null);
 
+  const dayShifts = schedule.shifts.filter((s) => s.date === date).map((s) => (preview?.id === s.id ? preview : s));
+
+  // 06시부터 24시까지. 익일 마감(26:00 등)이거나 자정 넘는 근무가 있으면 그 시각(정시로 올림)까지 늘린다
   const from = 6 * 60;
-  const to = 24 * 60;
+  const to = Math.ceil(Math.max(24 * 60, toMin(hoursOn(store, date).close), ...dayShifts.map((s) => toMin(s.end))) / 60) * 60;
   const span = to - from;
   const pct = (m: number) => `${((m - from) / span) * 100}%`;
-
-  const dayShifts = schedule.shifts.filter((s) => s.date === date).map((s) => (preview?.id === s.id ? preview : s));
 
   const people = staff
     .filter((p) => dayShifts.some((s) => s.staffId === p.id) || schedule.leaves.some((l) => l.staffId === p.id && l.date === date))
@@ -64,12 +65,12 @@ export default function DayView({ schedule, staff, store, dates, date, onDate, o
     const d = snap(((e.clientX - drag.x) / drag.width) * span);
     const o = drag.orig;
     const [s0, e0] = [toMin(o.start), toMin(o.end)];
-    const clamp = (m: number) => Math.min(Math.max(m, 0), 24 * 60);
+    const clamp = (m: number) => Math.min(Math.max(m, 0), to);
     let next = o;
     if (drag.mode === 'start') next = withTimes(o, fromMin(clamp(Math.min(s0 + d, e0 - MIN_SHIFT))), o.end);
     if (drag.mode === 'end') next = withTimes(o, o.start, fromMin(clamp(Math.max(e0 + d, s0 + MIN_SHIFT))));
     if (drag.mode === 'move') {
-      const dd = Math.min(Math.max(d, -s0), 24 * 60 - e0);
+      const dd = Math.min(Math.max(d, -s0), to - e0);
       next = placeBreak({ ...o, start: fromMin(s0 + dd), end: fromMin(e0 + dd), breakStart: o.breakStart && fromMin(toMin(o.breakStart) + dd) });
     }
     if (drag.mode === 'break' && o.breakStart) next = placeBreak({ ...o, breakStart: fromMin(toMin(o.breakStart) + d) });
@@ -118,7 +119,7 @@ export default function DayView({ schedule, staff, store, dates, date, onDate, o
             <div className="relative h-9">
               {hoursTicks.slice(0, -1).map((h) => (
                 <span key={h} className="absolute top-2.5 -translate-x-1/2 text-[11px] text-muted" style={{ left: pct(h) }}>
-                  {h / 60}
+                  {h >= 24 * 60 ? `익${h / 60 - 24}` : h / 60}
                 </span>
               ))}
             </div>
