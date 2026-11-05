@@ -70,6 +70,25 @@ export interface Slot {
 
 /** 시작 시각 순(같으면 끝나는 시각 순) */
 export const sortParts = (parts: Part[]) => [...parts].sort((a, b) => toMin(a.start) - toMin(b.start) || toMin(a.end) - toMin(b.end));
+/** 알바생을 고정 근무 파트 순서(시작 시각 순)로. 가장 이른 파트 → 그 파트를 맡는 첫 요일 → 등록 순. 파트가 없으면 맨 뒤 */
+export function sortByPart(staff: Staff[], parts: Part[]) {
+  const order = sortParts(parts).map((p) => p.id);
+  const key = (st: Staff) => {
+    let best = [order.length, 7];
+    st.availableParts.forEach((ids, day) =>
+      ids.forEach((id) => {
+        const i = order.indexOf(id);
+        if (i >= 0 && (i < best[0] || (i === best[0] && day < best[1]))) best = [i, day];
+      }),
+    );
+    return best;
+  };
+  return [...staff].sort((a, b) => {
+    const [ka, kb] = [key(a), key(b)];
+    return ka[0] - kb[0] || ka[1] - kb[1];
+  });
+}
+
 /** 날짜 → 시작 시각 → 끝 시각 순. 같으면 원래 순서 유지 */
 export const sortShifts = <T extends Pick<Shift, 'date' | 'start' | 'end'>>(shifts: T[]) =>
   [...shifts].sort((a, b) => a.date.localeCompare(b.date) || toMin(a.start) - toMin(b.start) || toMin(a.end) - toMin(b.end));

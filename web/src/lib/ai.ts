@@ -36,7 +36,7 @@ export function buildPrompt({ store, staff, req }: AiInput): string {
   const days = dates.map((d) => {
     const h = hoursOn(store, d);
     const holiday = isWeekendOrHoliday(d) && dayIndex(d) < 5;
-    return `${d} (${DAY_LABELS[dayIndex(d)]}${holiday ? ', 공휴일' : ''}) ${h.open}–${h.close}`;
+    return `${d} (${DAY_LABELS[dayIndex(d)]}${holiday ? ', 공휴일' : ''}) ${h.open}–${h.close}${toMin(h.close) > 24 * 60 ? ` (24시 이후는 익일, ${h.close} = 익일 ${fromMin(toMin(h.close) - 24 * 60)})` : ''}`;
   });
 
   return `당신은 한국 매장의 한 달 근무표를 짜는 도우미입니다. 아래 조건으로 ${req.periodStart.slice(0, 7)} 한 달 근무표를 JSON으로 만드세요.

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SEED_WEEK, seedStaff, seedStore, seedWeek as seedSchedule } from './fixtures';
 import type { Part, Shift } from '../../types';
 import { upgrade } from '../../api/mock';
-import { canWork, fixedShifts, gaps, hoursOn, minBreakFor, partBreakFor, requiredAt, requiredBreak, sizeOf, sortParts, sortShifts, validate, withTimes } from '../rules';
+import { canWork, fixedShifts, gaps, hoursOn, minBreakFor, partBreakFor, requiredAt, requiredBreak, sizeOf, sortByPart, sortParts, sortShifts, validate, withTimes } from '../rules';
 import { storeError } from '../../pages/Settings';
 import { datesBetween, dayIndex, monthEnd, weekDates, weeksOf } from '../time';
 import { autoFill } from '../autofill';
@@ -96,6 +96,9 @@ describe('매장 설정 검증', () => {
     expect(storeError(seedStore)).toBeNull();
     expect(storeError({ ...seedStore, open: '22:00', close: '08:00' })).toMatch('평일 영업 종료');
     expect(storeError({ ...seedStore, weekendOpen: '23:00' })).toMatch('주말·공휴일');
+    // 익일 마감(26:00 = 익일 02:00)은 통과, 24시간 넘으면 막는다
+    expect(storeError({ ...seedStore, open: '18:00', close: '26:00', weekendClose: '27:00' })).toBeNull();
+    expect(storeError({ ...seedStore, open: '08:00', close: '33:00' })).toMatch('24시간');
     const late = { ...seedStore.parts[2], end: '23:00' };
     expect(storeError({ ...seedStore, parts: [late] })).toBeNull();
     expect(storeError({ ...seedStore, parts: [{ ...late, name: ' ' }] })).toMatch('이름');
@@ -179,6 +182,13 @@ describe('파트 정렬', () => {
   it('시작 시각 순, 같으면 끝나는 시각 순', () => {
     const mk = (id: string, start: string, end: string) => ({ ...seedStore.parts[0], id, start, end });
     expect(sortParts([mk('a', '15:00', '19:00'), mk('b', '12:00', '17:00'), mk('c', '08:00', '14:00'), mk('d', '08:00', '12:00')]).map((p) => p.id)).toEqual(['d', 'c', 'b', 'a']);
+  });
+
+  it('알바생은 가장 이른 파트 → 첫 요일 → 등록 순, 파트 없으면 맨 뒤', () => {
+    const [early, late] = sortParts(seedStore.parts);
+    const mk = (id: number, days: Record<number, string>) => ({ ...seedStaff[2], id, availableParts: Array.from({ length: 7 }, (_, i) => (days[i] ? [days[i]] : [])) });
+    const staff = [mk(1, {}), mk(2, { 0: late.id }), mk(3, { 2: early.id }), mk(4, { 0: early.id, 1: late.id }), mk(5, { 2: early.id })];
+    expect(sortByPart(staff, [...seedStore.parts].reverse()).map((s) => s.id)).toEqual([4, 3, 5, 2, 1]);
   });
 
   it('고정 근무는 파트 순서와 상관없이 날짜·시작 시각 순으로 나온다', () => {

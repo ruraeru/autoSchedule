@@ -48,10 +48,15 @@ const sizeLabel = (size: Store['size']) => (size === 'OVER_5' ? '5인 이상' : 
 // 새 파트 색은 세 가지를 돌려 쓴다
 const TONES: PartTone[] = ['open', 'middle', 'close'];
 
+const DAY = 24 * 60;
+/** 익일 마감: 종료가 24시를 넘는다(26:00 = 익일 02:00) */
+const nextDay = (t: string) => toMin(t) > DAY;
+
 /** 저장 막는 이유. 없으면 null */
 export function storeError(s: Store): string | null {
   if (toMin(s.open) >= toMin(s.close)) return '평일 영업 종료 시각은 시작 시각보다 늦어야 합니다.';
   if (toMin(s.weekendOpen) >= toMin(s.weekendClose)) return '주말·공휴일 영업 종료 시각은 시작 시각보다 늦어야 합니다.';
+  if (toMin(s.close) - toMin(s.open) > DAY || toMin(s.weekendClose) - toMin(s.weekendOpen) > DAY) return '영업시간은 24시간을 넘을 수 없습니다.';
   for (const p of s.parts) {
     if (!p.name.trim()) return '파트 이름을 입력하세요.';
     if (toMin(p.start) >= toMin(p.end)) return `${p.name} 종료 시각은 시작 시각보다 늦어야 합니다.`;
@@ -98,8 +103,10 @@ export default function Settings() {
   const addPart = () => {
     const sorted = sortParts(form.parts);
     const last = sorted[sorted.length - 1];
-    const start = last && toMin(last.end) < toMin(form.close) ? last.end : form.open;
-    const end = fromMin(Math.min(toMin(start) + 4 * 60, toMin(form.close)));
+    // 파트 시각은 24:00까지만 고를 수 있어 익일 마감이어도 자정에서 자른다
+    const close = Math.min(toMin(form.close), DAY);
+    const start = last && toMin(last.end) < close ? last.end : form.open;
+    const end = fromMin(Math.min(toMin(start) + 4 * 60, close));
     const tone = TONES[form.parts.length % TONES.length];
     set({
       parts: [
@@ -171,7 +178,29 @@ export default function Settings() {
             <Fragment key={label}>
               <dt className="text-muted">영업시간 · {label}</dt>
               <dd className="mb-1 sm:mb-0">
-                <TimeRange label={`${label} 영업`} start={form[o]} end={form[c]} onChange={(a, b) => set({ [o]: a, [c]: b })} />
+                <span className="inline-flex items-center gap-2">
+                  <TimeRange
+                    label={`${label} 영업`}
+                    start={form[o]}
+                    end={nextDay(form[c]) ? fromMin(toMin(form[c]) - DAY) : form[c]}
+                    onChange={(a, b) => set({ [o]: a, [c]: nextDay(form[c]) ? fromMin(toMin(b) + DAY) : b })}
+                  />
+                  <button
+                    type="button"
+                    aria-pressed={nextDay(form[c])}
+                    aria-label={`${label} 영업 종료 익일`}
+                    onClick={() =>
+                      // 켜면 종료에 24시간을 더한다. 24:00(자정)이면 익일 01:00으로
+                      set({ [c]: nextDay(form[c]) ? fromMin(toMin(form[c]) - DAY) : fromMin(Math.max((toMin(form[c]) % DAY) + DAY, DAY + 60)) })
+                    }
+                    className={cx(
+                      'h-9 rounded-full border px-3 text-[13px]',
+                      nextDay(form[c]) ? 'border-ink bg-brand-subtle font-medium text-ink' : 'border-line-strong text-muted hover:bg-bg',
+                    )}
+                  >
+                    익일
+                  </button>
+                </span>
               </dd>
             </Fragment>
           ))}
