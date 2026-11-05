@@ -30,7 +30,8 @@
 
 ## 근무표 생성
 - **AI 생성:** 브라우저가 `buildPrompt`로 프롬프트를 만들어 `POST /ai/generate`에 `{ prompt }`로 보낸다. 서버 코드는 `web/api/generate.ts`(`handleGenerate`) 하나다.
-  - 배포(Vercel, 루트 `web/`): `api/generate.ts`가 함수로 돈다. `web/vercel.json`이 `/ai/generate`를 `/api/generate`로 보내고 `maxDuration` 300초를 준다. 나머지 경로(`/api/` 제외)는 `index.html`로 보내 새로고침·직접 접속을 살린다. Vercel 환경변수에 `LLM_*`를 넣어야 한다.
+  - 배포(Vercel, 루트 `web/`): `api/generate.ts`가 함수로 돈다. `web/vercel.json`이 `/ai/generate`를 `/api/generate`로 보내고 `maxDuration` 300초를 준다. 나머지 경로(`/api/` 제외)는 `index.html`로 보내 새로고침·직접 접속을 살린다. Vercel 환경변수에 `LLM_*`를 넣어야 한다(바꾸면 재배포해야 반영).
+  - 배포 주소: https://auto-schedule-one.vercel.app . main에 머지하면 자동 배포된다. 확인은 `curl`로 `/staff`(200)와 `POST /ai/generate`(`{"prompt":"..."}` → 200)를 부른다.
   - 로컬: vite dev/preview 서버 미들웨어(`vite.config.ts`)가 같은 `handleGenerate`를 쓴다.
   - `api/generate.ts`는 Vercel이 따로 컴파일하므로 다른 파일을 import하지 않는다. 브라우저 코드에서도 import하지 않는다.
   - 환경변수는 `web/.env.example`을 `web/.env.local`로 복사해서 정한다.
@@ -84,6 +85,7 @@
 - `web/README.md`는 예전 내용이 남아 있어 최신이 아니다.
 
 ## 작업 방식
-- git: 보통 기능 브랜치(`feat/...`)에서 커밋·푸시한다. 머지를 요청받으면 `gh pr create`로 PR을 올리고 `gh pr merge --rebase --delete-branch`로 머지한다. main에 직접 머지하거나 푸시하지 않는다. 커밋 메시지는 한국어이고, 끝에 `Co-Authored-By` 줄을 붙인다.
+- git: 보통 기능 브랜치(`feat/...`)에서 커밋·푸시한다. 머지를 요청받으면 `gh pr create`로 PR을 올리고 `gh pr merge --rebase --delete-branch`로 머지한다. main에 직접 머지하거나 푸시하지 않는다. PR을 만든 직후에는 GitHub가 머지 가능 여부를 아직 계산하지 못해 `gh pr merge`가 실패할 수 있으니 몇 초 뒤 다시 시도한다.
+- "커밋푸시해"는 기능 브랜치에 커밋·푸시까지, "머지해"는 PR 생성과 머지까지 한다. 머지 뒤 로컬은 main으로 돌아온다. 커밋 메시지는 한국어이고, 끝에 `Co-Authored-By` 줄을 붙인다.
 - 커밋 전에 `.env*`가 포함되지 않았는지, 키 문자열이 없는지 확인한다.
 - 이 환경에는 브라우저 도구가 없다. UI 변경은 타입 검사·테스트·빌드로만 검증한 것이며, 화면을 직접 보지 못했다고 사용자에게 알린다.
