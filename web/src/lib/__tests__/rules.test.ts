@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SEED_WEEK, seedStaff, seedStore, seedWeek as seedSchedule } from './fixtures';
 import type { Part, Shift } from '../../types';
 import { upgrade } from '../../api/mock';
-import { canWork, fixedShifts, gaps, hoursOn, minBreakFor, partBreakFor, requiredAt, requiredBreak, sizeOf, sortParts, validate, withTimes } from '../rules';
+import { canWork, fixedShifts, gaps, hoursOn, minBreakFor, partBreakFor, requiredAt, requiredBreak, sizeOf, sortParts, sortShifts, validate, withTimes } from '../rules';
 import { storeError } from '../../pages/Settings';
 import { datesBetween, dayIndex, monthEnd, weekDates, weeksOf } from '../time';
 import { autoFill } from '../autofill';
@@ -164,7 +164,8 @@ describe('autoFill', () => {
     const kept = seedSchedule.shifts.slice(0, 3);
     const leave = { id: 'l', staffId: 3, date: dates[1], type: 'ANNUAL' as const };
     const res = autoFill(seedStore, seedStaff, dates, kept, [leave], () => `b${++n}`);
-    expect(res.slice(0, 3)).toEqual(kept);
+    expect(res).toEqual(expect.arrayContaining(kept));
+    expect(res).toEqual(sortShifts(res));
     expect(res.some((s) => s.staffId === 3 && s.date === dates[1])).toBe(false);
   });
 
@@ -178,6 +179,15 @@ describe('파트 정렬', () => {
   it('시작 시각 순, 같으면 끝나는 시각 순', () => {
     const mk = (id: string, start: string, end: string) => ({ ...seedStore.parts[0], id, start, end });
     expect(sortParts([mk('a', '15:00', '19:00'), mk('b', '12:00', '17:00'), mk('c', '08:00', '14:00'), mk('d', '08:00', '12:00')]).map((p) => p.id)).toEqual(['d', 'c', 'b', 'a']);
+  });
+
+  it('고정 근무는 파트 순서와 상관없이 날짜·시작 시각 순으로 나온다', () => {
+    const store = { ...seedStore, parts: [...seedStore.parts].reverse() };
+    let n = 0;
+    const out = fixedShifts(store, [...seedStaff].reverse(), weekDates(SEED_WEEK), () => `s${++n}`);
+    expect(out.length).toBeGreaterThan(1);
+    expect(out).toEqual(sortShifts(out));
+    expect(out.map((s) => `${s.date} ${s.start}`)).toEqual(out.map((s) => `${s.date} ${s.start}`).sort());
   });
 
   it('예전 주말 복사본(id_WE)은 원래 파트로 합친다', () => {

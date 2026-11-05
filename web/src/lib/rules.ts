@@ -70,6 +70,9 @@ export interface Slot {
 
 /** 시작 시각 순(같으면 끝나는 시각 순) */
 export const sortParts = (parts: Part[]) => [...parts].sort((a, b) => toMin(a.start) - toMin(b.start) || toMin(a.end) - toMin(b.end));
+/** 날짜 → 시작 시각 → 끝 시각 순. 같으면 원래 순서 유지 */
+export const sortShifts = <T extends Pick<Shift, 'date' | 'start' | 'end'>>(shifts: T[]) =>
+  [...shifts].sort((a, b) => a.date.localeCompare(b.date) || toMin(a.start) - toMin(b.start) || toMin(a.end) - toMin(b.end));
 
 /** t분에 필요한 인원: 그 시각을 덮는 파트들의 필요 인원 합 */
 export function requiredAt(store: Store, t: number) {
@@ -92,7 +95,7 @@ export function canWork(st: Staff, store: Store, s: Pick<Shift, 'date' | 'start'
 
 /** 고정 근무를 한 달 날짜에 깐다. 직원은 요일별 시각(영업시간 밖이면 뺀다), 알바생은 그 요일에 고른 파트마다 */
 export function fixedShifts(store: Store, staff: Staff[], dates: string[], uid: () => string): Shift[] {
-  return staff.flatMap((st) =>
+  return sortShifts(staff.flatMap((st) =>
     dates.flatMap((date) => {
       const base = { staffId: st.id, date, start: '', end: '', partId: null, breakStart: null, breakMinutes: 0, tentative: false };
       if (st.employmentType === 'PART_TIME') {
@@ -104,7 +107,7 @@ export function fixedShifts(store: Store, staff: Staff[], dates: string[], uid: 
       if (!w || toMin(w.start) < toMin(h.open) || toMin(w.end) > toMin(h.close)) return [];
       return [withTimes({ ...base, id: uid() }, w.start, w.end)];
     }),
-  );
+  ));
 }
 
 /** 그 날의 영업시간 (평일 / 주말·공휴일) */

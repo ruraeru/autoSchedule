@@ -1,6 +1,6 @@
 // AI 없이 규칙만으로 근무표 채우기
 import type { Leave, Shift, Staff, Store } from '../types';
-import { fixedShifts } from './rules';
+import { fixedShifts, sortShifts } from './rules';
 
 /**
  * 이미 있는 근무는 그대로 두고 고정 근무를 넣는다.
@@ -10,5 +10,5 @@ import { fixedShifts } from './rules';
 export function autoFill(store: Store, staff: Staff[], dates: string[], existing: Shift[], leaves: Leave[], uid: () => string): Shift[] {
   const off = (f: Shift) => leaves.some((l) => l.staffId === f.staffId && l.date === f.date);
   const has = (f: Shift) => existing.some((s) => s.staffId === f.staffId && s.date === f.date && (!f.partId || s.partId === f.partId));
-  return [...existing, ...fixedShifts(store, staff, dates, uid).filter((f) => !off(f) && !has(f))];
+  return sortShifts([...existing, ...fixedShifts(store, staff, dates, uid).filter((f) => !off(f) && !has(f))]);
 }

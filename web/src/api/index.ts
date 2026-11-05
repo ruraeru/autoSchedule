@@ -1,5 +1,6 @@
 // REST API (PRD §10). VITE_USE_MOCK=false 이면 Spring Boot 서버(/api)로 요청한다.
 import type { GenerateRequest, Schedule, Staff, Store, Template } from '../types';
+import { sortParts } from '../lib/rules';
 import { mock } from './mock';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
@@ -16,7 +17,8 @@ async function http<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 export const api = {
-  getStore: (): Promise<Store> => (USE_MOCK ? mock.getStore() : http('GET', '/stores/me')),
+  // 파트는 어디서나 시작 시각 순으로 쓴다(mock은 저장할 때 이미 정렬)
+  getStore: (): Promise<Store> => (USE_MOCK ? mock.getStore() : http<Store>('GET', '/stores/me').then((s) => ({ ...s, parts: sortParts(s.parts) }))),
   updateStore: (s: Store): Promise<Store> => (USE_MOCK ? mock.updateStore(s) : http('PUT', '/stores/me', s)),
 
   listStaff: (): Promise<Staff[]> => (USE_MOCK ? mock.listStaff() : http('GET', '/staff')),
@@ -32,6 +34,7 @@ export const api = {
     USE_MOCK ? mock.confirmSchedule(id) : http('POST', `/schedules/${id}/confirm`),
   createSchedule: (periodStart: string, prefillFixed: boolean): Promise<Schedule> =>
     USE_MOCK ? mock.createSchedule(periodStart, prefillFixed) : http('POST', '/schedules', { periodStart, prefillFixed }),
+  deleteSchedule: (id: number): Promise<null> => (USE_MOCK ? mock.deleteSchedule(id) : http('DELETE', `/schedules/${id}`)),
   generateSchedule: (req: GenerateRequest): Promise<Schedule> =>
     USE_MOCK ? mock.generateSchedule(req) : http('POST', '/schedules/generate', req),
 

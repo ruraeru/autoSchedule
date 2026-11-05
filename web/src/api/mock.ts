@@ -1,5 +1,5 @@
 // 백엔드 없이 동작하는 브라우저 DB. localStorage에 보관해 새로고침해도 유지한다.
-import { fixedShifts, sizeOf, sortParts } from '../lib/rules';
+import { fixedShifts, sizeOf, sortParts, sortShifts } from '../lib/rules';
 import { buildPrompt, toShifts, type AiInput, type AiOutput } from '../lib/ai';
 import { datesBetween, dayIndex, monthEnd, weeksOf } from '../lib/time';
 import type { GenerateRequest, Schedule, Shift, Staff, Store, Template, Part } from '../types';
@@ -177,7 +177,7 @@ export const mock = {
     const partTimers = db.staff.filter((s) => s.employmentType === 'PART_TIME');
     const dates = datesBetween(req.periodStart, monthEnd(req.periodStart));
     // 알바생은 고정 근무 파트대로, 직원은 AI 응답으로
-    const shifts = [...fixedShifts(db.store, partTimers, dates, uid), ...toShifts(out, input, uid)];
+    const shifts = sortShifts([...fixedShifts(db.store, partTimers, dates, uid), ...toShifts(out, input, uid)]);
     if (!shifts.length) throw new Error('AI가 조건에 맞는 근무를 만들지 못했습니다');
     const schedule: Schedule = {
       id: Math.max(0, ...db.schedules.map((s) => s.id)) + 1,
@@ -211,6 +211,11 @@ export const mock = {
     db.templates.push(t);
     persist();
     return delay(t);
+  },
+  deleteSchedule(id: number) {
+    db.schedules = db.schedules.filter((s) => s.id !== id);
+    persist();
+    return delay(null);
   },
   deleteTemplate(id: number) {
     db.templates = db.templates.filter((t) => t.id !== id);
