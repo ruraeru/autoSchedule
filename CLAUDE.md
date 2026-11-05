@@ -54,7 +54,7 @@
 - 직접 만들기: `/schedules/manual` → `CreateSchedule.tsx`.
 - 에디터: `/schedules/:id` → `pages/schedule/ScheduleEditor.tsx`.
   - 보기: 한 달(`MonthView`), 파트별, 인원별, 일간(06–24시).
-  - 기능: 전월·익월 이동, 자동 채우기, 근무 추가·수정 창(`ShiftDialog`).
+  - 기능: 전월·익월 이동, 자동 채우기, 근무 추가·수정 창(`ShiftDialog`), 근무표 삭제(오른쪽 패널, 확인 후 목록으로).
 - 직원·알바생 관리: `/staff` → `pages/Staff.tsx`. 알바생은 근무 파트 표(행=파트, 열=요일), 직원은 요일별 고정 근무 시각.
 - 템플릿: `/templates`.
 - 매장 설정: `/settings` → `pages/Settings.tsx`. 영업시간은 평일과 주말·공휴일을 따로 정한다. 근무 파트는 개수 제한 없이 추가할 수 있다. 사업장 규모는 자동/5인 미만/5인 이상 중에서 고르고, 수동으로 바꿀 때는 확인 창을 띄운다.

@@ -88,6 +88,14 @@ export default function ScheduleEditor() {
     },
     onSuccess: (t) => t && qc.invalidateQueries({ queryKey: keys.templates }),
   });
+  const remove = useMutation({
+    mutationFn: () => api.deleteSchedule(id),
+    onSuccess: () => {
+      qc.removeQueries({ queryKey: keys.schedule(id) });
+      qc.invalidateQueries({ queryKey: keys.schedules });
+      navigate('/schedules', { replace: true });
+    },
+  });
 
   if (error) return <p className="text-sm text-danger">근무표를 불러오지 못했습니다: {String(error.message)}</p>;
   if (!draft || draft.id !== id || !staff || !store || !v) return <Loading />;
@@ -233,12 +241,26 @@ export default function ScheduleEditor() {
             v={v}
             comment={draft.aiComment}
             actions={
-              <div className="flex gap-2">
-                <Button size="sm" className="flex-1" onClick={exportPng}>
-                  이미지 저장
-                </Button>
-                <Button size="sm" className="flex-1" onClick={() => saveTemplate.mutate()}>
-                  템플릿으로 저장
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <Button size="sm" className="flex-1" onClick={exportPng}>
+                    이미지 저장
+                  </Button>
+                  <Button size="sm" className="flex-1" onClick={() => saveTemplate.mutate()}>
+                    템플릿으로 저장
+                  </Button>
+                </div>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  disabled={remove.isPending}
+                  onClick={() =>
+                    window.confirm(
+                      `${monthLabel(draft.periodStart)} 근무표를 삭제할까요?${draft.status === 'CONFIRMED' ? ' 확정된 근무표입니다.' : ''}${dirty ? ' 저장하지 않은 변경도 사라집니다.' : ''} 되돌릴 수 없습니다.`,
+                    ) && remove.mutate()
+                  }
+                >
+                  근무표 삭제
                 </Button>
               </div>
             }
@@ -247,7 +269,7 @@ export default function ScheduleEditor() {
       )}
 
       {dialog && <ShiftDialog target={dialog} staff={staff} store={store} onClose={() => setDialog(null)} />}
-      {(save.error || confirm.error) && <p className="mt-3 text-sm text-danger">{String((save.error ?? confirm.error)!.message)}</p>}
+      {(save.error || confirm.error || remove.error) && <p className="mt-3 text-sm text-danger">{String((save.error ?? confirm.error ?? remove.error)!.message)}</p>}
       {draft.status === 'CONFIRMED' && (
         <p className="mt-3 text-sm text-muted">
           확정된 근무표입니다. 수정 후 저장하면 변경 내역이 반영됩니다. <Link to="/schedules" className="underline underline-offset-2">목록으로</Link>
