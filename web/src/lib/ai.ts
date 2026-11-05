@@ -1,6 +1,6 @@
 // AI 근무표 생성: 프롬프트 만들기와 응답 검증(둘 다 브라우저). 호출은 서버(api/generate.ts)가 한다
 import type { GenerateRequest, Shift, Staff, Store } from '../types';
-import { canWork, hoursOn, withTimes } from './rules';
+import { canWork, hoursOn, sortParts, withTimes } from './rules';
 import { datesBetween, dayIndex, DAY_LABELS, fromMin, isWeekendOrHoliday, monthEnd, snap, toMin } from './time';
 
 export interface AiInput {
@@ -45,7 +45,7 @@ export function buildPrompt({ store, staff, req }: AiInput): string {
 ${days.join('\n')}
 
 ## 근무 파트와 필요 인원 (휴게 중인 사람은 빼고 셈, 겹치는 파트는 더함)
-${store.parts.map((p) => `- partId "${p.id}" ${p.name} ${p.start}–${p.end} 필요 ${p.required}명`).join('\n') || '- 없음'}
+${sortParts(store.parts).map((p) => `- partId "${p.id}" ${p.name} ${p.start}–${p.end} 필요 ${p.required}명`).join('\n') || '- 없음'}
 
 ## 구성원 (#번호 = staffId)
 ${people.join('\n')}

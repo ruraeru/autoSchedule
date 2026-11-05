@@ -22,7 +22,8 @@
 - 예시 데이터는 앱에 없다. 테스트 전용 `src/lib/__tests__/fixtures.ts`(카페 커푸치노 성수점, 2026-11-02 주).
 - 매장 기본값: `src/api/defaults.ts`.
 - 구성원:
-  - 근무 파트: 평일·주말 구분이 없다. 저장할 때 시작 시각 순으로 정렬한다(`sortParts`).
+  - 근무 파트: 평일·주말 구분이 없다. 시작 시각 순으로 정렬한다(`sortParts`): mock 로드·저장, 백엔드 모드 `api.getStore`, AI 프롬프트.
+  - 생성된 근무(고정 근무, 자동 채우기, AI 생성)는 날짜 → 시작 시각 순이다(`sortShifts`).
   - 알바생: `availableParts[요일][]`(0=월)는 고정 근무 파트다. 고른 칸에는 반드시 배치한다.
   - 직원: `workHours`는 요일별 `{start,end}|null` 배열(고정 근무)이다.
 - 근무표는 달력 기준 한 달(1일~말일)이다. 화면은 주(월~일) 탭으로 나눈다(`weeksOf`).
@@ -48,7 +49,7 @@
 ## 화면 (라우트 → 파일)
 - 로그인·회원가입: `/login`·`/signup` → `pages/Auth.tsx`. mock 계정은 localStorage에 있다. 로그인 가드는 `components/Layout.tsx`.
 - 대시보드: `/` → `pages/Dashboard.tsx`. 오늘 근무 띠(`components/TodayStrip.tsx`), 통계 띠, 직원 근무 현황.
-- 근무표 목록: `/schedules`.
+- 근무표 목록: `/schedules` → `pages/Schedules.tsx`. 행마다 삭제 버튼(확인 창, `api.deleteSchedule`).
 - AI 생성: `/schedules/new` → `Generate.tsx`. 진행률 막대는 걸린 시간으로 추정한다.
 - 직접 만들기: `/schedules/manual` → `CreateSchedule.tsx`.
 - 에디터: `/schedules/:id` → `pages/schedule/ScheduleEditor.tsx`.
