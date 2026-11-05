@@ -1,7 +1,7 @@
 // 인원별 주간 보기: 직원(유동 근무)과 알바생(파트 근무)을 한 표에
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { Avatar, Badge, cx, ShiftBlock } from '../../components/ui';
-import type { StaffWeek, Validation } from '../../lib/rules';
+import { sortByPart, type StaffWeek, type Validation } from '../../lib/rules';
 import { hours } from '../../lib/time';
 import { useEditor } from '../../store/editor';
 import type { Schedule, Staff, Store } from '../../types';
@@ -21,7 +21,7 @@ export default function PersonView({ schedule, staff, store, v, dates, onOpen }:
   const edit = useEditor((s) => s.edit);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const fullTime = staff.filter((s) => s.employmentType === 'FULL_TIME');
-  const partTime = staff.filter((s) => s.employmentType === 'PART_TIME');
+  const partTime = sortByPart(staff.filter((s) => s.employmentType === 'PART_TIME'), store.parts);
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over) return;

@@ -45,10 +45,13 @@ export interface Store {
   sizeMode: 'AUTO' | 'UNDER_5' | 'OVER_5';
   /** 실제 적용 규모. 저장할 때 sizeMode·구성원 수로 다시 정해진다 */
   size: 'UNDER_5' | 'OVER_5';
-  /** 평일 영업시간 */
+  /**
+   * 평일 영업시간. 익일 마감은 close를 24시 넘겨 적는다(26:00 = 익일 02:00).
+   * shortcut: HH:MM 문자열에 24 이상 시를 쓴다. 백엔드 LocalTime으로는 못 받으니 연동 때 분 단위 정수나 익일 플래그로 바꾼다
+   */
   open: string;
   close: string;
-  /** 주말·공휴일 영업시간 */
+  /** 주말·공휴일 영업시간. 익일 마감 표기는 평일과 같다 */
   weekendOpen: string;
   weekendClose: string;
   parts: Part[];
